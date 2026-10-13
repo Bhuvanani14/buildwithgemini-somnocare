@@ -4,6 +4,10 @@ SomnoCare is a clinical-guidance AI agent designed to assist obstructive sleep a
 
 ---
 
+![SomnoCare Demo](demo.gif)
+
+---
+
 ## What the Agent Does
 
 SomnoCare provides interactive support for sleep therapy routines through structured tools and backend integrations:
