@@ -1,208 +1,919 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent</title>
-<!-- Optional: used only to draw A2UI Icon components. If it can't load (offline/
-     corp network), icons fall back to showing their name as text. -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined">
-<style>
-  :root { --accent:#1a73e8; --bg:#f6f8fa; --border:#dfe3e8; }
-  * { box-sizing:border-box; }
-  body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); display:flex; flex-direction:column; height:100vh; }
-  header { background:var(--accent); color:#fff; padding:.9rem 1.2rem; font-weight:700; }
-  #log { flex:1; overflow-y:auto; padding:1.2rem; max-width:780px; width:100%; margin:0 auto; }
-  .msg { margin:.6rem 0; }
-  .msg.user { text-align:right; }
-  .bubble { display:inline-block; padding:.6rem .9rem; border-radius:12px; background:#fff; border:1px solid var(--border); text-align:left; max-width:90%; white-space:pre-wrap; }
-  .msg.user .bubble { background:var(--accent); color:#fff; border:none; }
-  /* When the reply is an A2UI card, drop the bubble chrome so the card stands alone. */
-  .bubble.rich { background:transparent; border:none; padding:0; max-width:100%; white-space:normal; }
-  form { display:flex; gap:.5rem; padding:1rem; border-top:1px solid var(--border); background:#fff; }
-  input { flex:1; padding:.7rem; border:1px solid var(--border); border-radius:8px; font-size:1rem; }
-  button { padding:.7rem 1.1rem; border:none; border-radius:8px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer; }
-
-  /* --- A2UI component styles (Card, Column, Row, Text, Divider, List, Image, Icon) --- */
-  .a2card { border:1px solid var(--border); border-radius:12px; padding:1rem; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.06); max-width:100%; }
-  .a2card + .a2card, .a2col > .a2card { margin-top:.6rem; }
-  .a2col { display:flex; flex-direction:column; gap:.4rem; }
-  .a2row { display:flex; flex-direction:row; gap:.6rem; align-items:center; flex-wrap:wrap; }
-  .a2row.between { justify-content:space-between; }
-  .a2text { margin:0; line-height:1.4; }
-  .a2text.a2-h1 { font-size:1.5rem; font-weight:700; }
-  .a2text.a2-h2 { font-size:1.25rem; font-weight:700; }
-  .a2text.a2-h3 { font-size:1.1rem; font-weight:600; }
-  .a2text.a2-h4 { font-size:1rem; font-weight:600; }
-  .a2text.a2-caption { font-size:.85rem; color:#666; }
-  .a2divider { border:none; border-top:1px solid var(--border); margin:.4rem 0; width:100%; }
-  .a2img { max-width:100%; border-radius:8px; display:block; }
-  .material-symbols-outlined { font-family:'Material Symbols Outlined'; font-size:1.25rem; line-height:1; vertical-align:middle; color:var(--accent); }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SomnoCare — Intelligent CPAP, OSA Screening & Lifestyle Command Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,0,0&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/app.css" />
 </head>
-<body>
-<header>Your Agent</header>
-<div id="log"></div>
-<form id="form">
-  <input id="input" placeholder="Ask something…" autocomplete="off" autofocus>
-  <button>Send</button>
-</form>
+<body class="bg-slate-950 text-slate-100 antialiased selection:bg-sky-500 selection:text-white">
 
-<script>
-const log = document.getElementById("log");
-const form = document.getElementById("form");
-const input = document.getElementById("input");
+  <!-- TOP CLINICAL DISCLAIMER & STATUS BAR -->
+  <div class="bg-gradient-to-r from-sky-950 via-slate-900 to-indigo-950 border-b border-slate-800/80 px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2">
+    <div class="flex items-center gap-2 text-sky-300">
+      <span class="material-symbols-outlined text-base text-amber-400">verified_user</span>
+      <span><strong>Clinical Guardrail:</strong> SomnoCare provides educational wellness &amp; CPAP adherence guidance only — not a medical diagnosis. Never alter prescribed pressure (cmH<sub>2</sub>O) without physician approval.</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span id="live-streak-pill" class="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 font-medium">🚭 18d Smoke-Free Streak</span>
+      <span id="live-cms-pill" class="px-2.5 py-0.5 rounded-full bg-sky-500/15 border border-sky-500/40 text-sky-300 font-medium">✅ CMS Compliant</span>
+      <a href="/api/doctor-report.pdf" target="_blank" class="px-3 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-semibold flex items-center gap-1 transition shadow-sm">
+        <span class="material-symbols-outlined text-sm">picture_as_pdf</span> Doctor PDF Report
+      </a>
+    </div>
+  </div>
 
-function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  <!-- EMERGENCY RED-FLAG MODAL / BANNER (Hidden unless triggered) -->
+  <div id="red-flag-banner" class="hidden bg-rose-950/95 border-b-2 border-rose-500 px-6 py-4 text-rose-100">
+    <div class="max-w-7xl mx-auto flex items-start justify-between gap-4">
+      <div class="flex items-start gap-3">
+        <span class="material-symbols-outlined text-3xl text-rose-400 animate-pulse">emergency</span>
+        <div>
+          <h3 id="red-flag-title" class="font-bold text-lg text-white">Urgent Clinical Safety Alert</h3>
+          <p id="red-flag-body" class="text-sm text-rose-200 mt-0.5"></p>
+        </div>
+      </div>
+      <button onclick="document.getElementById('red-flag-banner').classList.add('hidden')" class="px-3 py-1 rounded bg-rose-800 hover:bg-rose-700 text-xs font-semibold">Acknowledge</button>
+    </div>
+  </div>
 
-function bubble(who) {
-  const m = el("div", "msg " + who);
-  const b = el("div", "bubble");
-  m.appendChild(b); log.appendChild(m); log.scrollTop = log.scrollHeight;
-  return b;
-}
+  <!-- MAIN SHELL -->
+  <div class="flex min-h-[calc(100vh-37px)]">
 
-/* ----------------------------------------------------------------------------
- * A2UI mini-renderer (v0.8 Basic Catalog subset).
- * Renders Card / Column / Row / Text / Divider / List / Image / Icon.
- * Anything else falls back to plain text (see renderReply). All text goes in via
- * textContent and image URLs are validated, so agent output can't inject HTML.
- * -------------------------------------------------------------------------- */
+    <!-- SIDEBAR NAVIGATION -->
+    <aside class="w-68 bg-slate-900/90 border-r border-slate-800/80 flex flex-col justify-between shrink-0 max-md:hidden">
+      <div>
+        <!-- Brand Header -->
+        <div class="p-5 border-b border-slate-800/80 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
+            <span class="material-symbols-outlined text-white text-2xl">pulmonology</span>
+          </div>
+          <div>
+            <h1 class="font-extrabold text-lg tracking-tight text-white leading-none">SomnoCare <span class="text-xs font-semibold text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded">v2.0</span></h1>
+            <p class="text-xs text-slate-400 mt-1">CPAP &amp; OSA Risk Companion</p>
+          </div>
+        </div>
 
-// A "bound value" is usually {literalString: "..."}; we only support literals.
-function boundStr(v) {
-  if (v == null) return "";
-  if (typeof v === "string") return v;
-  if (typeof v.literalString === "string") return v.literalString;
-  return "";
-}
+        <!-- Navigation Links -->
+        <nav class="p-3 space-y-1" id="sidebar-nav">
+          <button onclick="switchTab('dashboard')" data-tab="dashboard" class="nav-btn active w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition">
+            <span class="material-symbols-outlined text-lg">Space_Dashboard</span>
+            <span>Risk &amp; Trend Command</span>
+          </button>
+          <button onclick="switchTab('profile')" data-tab="profile" class="nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition">
+            <span class="material-symbols-outlined text-lg">assignment_ind</span>
+            <span>Profile, STOP-BANG &amp; ESS</span>
+          </button>
+          <button onclick="switchTab('snoring')" data-tab="snoring" class="nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition">
+            <span class="material-symbols-outlined text-lg">graphic_eq</span>
+            <span>Sleep, Snore &amp; Voice Log</span>
+          </button>
+          <button onclick="switchTab('exercise')" data-tab="exercise" class="nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition">
+            <span class="material-symbols-outlined text-lg">self_improvement</span>
+            <span>OpenCV Pose &amp; Yoga Coach</span>
+          </button>
+          <button onclick="switchTab('lifestyle')" data-tab="lifestyle" class="nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition">
+            <span class="material-symbols-outlined text-lg">air</span>
+            <span>Breathing, Diet &amp; Climate</span>
+          </button>
+          <button onclick="switchTab('careteam')" data-tab="careteam" class="nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition">
+            <span class="material-symbols-outlined text-lg">clinical_notes</span>
+            <span>Care Team, PDF &amp; Clinics</span>
+          </button>
+          <button onclick="switchTab('agent')" data-tab="agent" class="nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition">
+            <span class="material-symbols-outlined text-lg">smart_toy</span>
+            <span>SomnoCare Gemini Agent</span>
+          </button>
+        </nav>
+      </div>
 
-// child ids of a component's props: single `child` and/or `children.explicitList`.
-function childIds(props) {
-  const ids = [];
-  if (props && typeof props.child === "string") ids.push(props.child);
-  const ch = props && props.children;
-  if (ch && Array.isArray(ch.explicitList)) for (const c of ch.explicitList) if (typeof c === "string") ids.push(c);
-  return ids;
-}
+      <!-- Patient Mini Card in Footer -->
+      <div class="p-4 m-3 rounded-xl bg-slate-800/60 border border-slate-700/60 text-xs space-y-1.5">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-slate-200" id="sb-patient-name">Arjun Mehta</span>
+          <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-semibold" id="sb-risk-badge">STOP-BANG 5/8</span>
+        </div>
+        <div class="text-slate-400 flex justify-between">
+          <span>BMI: <strong class="text-slate-200" id="sb-bmi">29.5</strong></span>
+          <span>Age: <strong class="text-slate-200" id="sb-age">52y</strong></span>
+        </div>
+        <div class="text-slate-400 truncate" id="sb-mask">Mask: AirFit N20 (10.5 cmH2O)</div>
+      </div>
+    </aside>
 
-// A2UI icon names are camelCase (locationOn); Material Symbols wants snake_case.
-function iconName(n) { return String(n || "").replace(/([a-z0-9])([A-Z])/g, "$1_$2").replace(/\s+/g, "_").toLowerCase(); }
+    <!-- MAIN CONTENT AREA -->
+    <main class="flex-1 overflow-y-auto p-6 max-w-7xl mx-auto space-y-6">
 
-function buildNode(id, comps, seen) {
-  if (!id || seen.has(id)) return null;   // missing / cycle guard
-  seen.add(id);
-  const spec = comps[id];
-  if (!spec || typeof spec !== "object") return null;
-  const type = Object.keys(spec)[0];
-  const props = spec[type] || {};
-  const kids = () => childIds(props).map(cid => buildNode(cid, comps, seen)).filter(Boolean);
+      <!-- MOBILE NAV -->
+      <div class="md:hidden flex gap-2 overflow-x-auto pb-2">
+        <button onclick="switchTab('dashboard')" class="px-3 py-1.5 rounded-lg bg-slate-800 text-xs font-semibold shrink-0">Dashboard</button>
+        <button onclick="switchTab('profile')" class="px-3 py-1.5 rounded-lg bg-slate-800 text-xs font-semibold shrink-0">STOP-BANG &amp; BMI</button>
+        <button onclick="switchTab('snoring')" class="px-3 py-1.5 rounded-lg bg-slate-800 text-xs font-semibold shrink-0">Snore &amp; Voice Log</button>
+        <button onclick="switchTab('exercise')" class="px-3 py-1.5 rounded-lg bg-slate-800 text-xs font-semibold shrink-0">OpenCV Coach</button>
+        <button onclick="switchTab('lifestyle')" class="px-3 py-1.5 rounded-lg bg-slate-800 text-xs font-semibold shrink-0">Breathing &amp; Diet</button>
+        <button onclick="switchTab('careteam')" class="px-3 py-1.5 rounded-lg bg-slate-800 text-xs font-semibold shrink-0">Doctor PDF</button>
+        <button onclick="switchTab('agent')" class="px-3 py-1.5 rounded-lg bg-sky-600 text-xs font-semibold shrink-0">AI Agent</button>
+      </div>
 
-  switch (type) {
-    case "Card": {
-      const d = el("div", "a2card"); kids().forEach(n => d.appendChild(n)); return d;
-    }
-    case "Column":
-    case "List": {
-      const horizontal = type === "List" && props.direction === "horizontal";
-      const d = el("div", horizontal ? "a2row" : "a2col"); kids().forEach(n => d.appendChild(n)); return d;
-    }
-    case "Row": {
-      const d = el("div", "a2row" + (props.distribution === "spaceBetween" ? " between" : ""));
-      kids().forEach(n => d.appendChild(n)); return d;
-    }
-    case "Text": {
-      const t = el("div", "a2text");
-      const hint = String(props.usageHint || "body").toLowerCase();
-      if (["h1", "h2", "h3", "h4", "h5", "h6"].includes(hint)) t.classList.add("a2-" + hint);
-      else if (hint === "caption") t.classList.add("a2-caption");
-      t.textContent = boundStr(props.text);
-      return t;
-    }
-    case "Divider":
-      return el("hr", "a2divider");
-    case "Image": {
-      const src = boundStr(props.url || props.src);
-      if (!/^https?:\/\//i.test(src)) return null;   // only allow safe URLs
-      const img = el("img", "a2img"); img.src = src; img.alt = boundStr(props.alt) || ""; return img;
-    }
-    case "Icon": {
-      const s = el("span", "material-symbols-outlined"); s.textContent = iconName(boundStr(props.name) || props.name); return s;
-    }
-    default:
-      return null;   // unknown component -> skipped (text fallback covers content)
-  }
-}
+      <!-- =============================================================== -->
+      <!-- TAB 1: EXECUTIVE RISK & TREND COMMAND CENTER                    -->
+      <!-- =============================================================== -->
+      <section id="tab-dashboard" class="tab-pane space-y-6">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 class="text-2xl font-bold text-white">Executive Sleep &amp; OSA Risk Command Center</h2>
+            <p class="text-sm text-slate-400">Real-time CPAP adherence, STOP-BANG risk drivers, acoustic snoring correlation, and AI weekly insights.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="switchTab('snoring')" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-base text-sky-400">mic</span> Voice / Quick Log
+            </button>
+            <button onclick="switchTab('exercise')" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-base">videocam</span> Start OpenCV Pose Coach
+            </button>
+          </div>
+        </div>
 
-// Render one or more A2UI messages (beginRendering + surfaceUpdate) into `container`.
-// Returns true if anything was drawn.
-function renderSurface(messages, container) {
-  const comps = {};
-  const roots = [];
-  for (const m of messages) {
-    if (m.beginRendering && typeof m.beginRendering.root === "string") roots.push(m.beginRendering.root);
-    const su = m.surfaceUpdate;
-    if (su && Array.isArray(su.components)) for (const c of su.components) if (c && c.id && c.component) comps[c.id] = c.component;
-  }
-  let rootIds = roots.filter(r => comps[r]);
-  if (rootIds.length === 0) {   // no valid root given -> infer un-referenced components
-    const referenced = new Set();
-    for (const id in comps) { const spec = comps[id]; childIds(spec[Object.keys(spec)[0]] || {}).forEach(c => referenced.add(c)); }
-    rootIds = Object.keys(comps).filter(id => !referenced.has(id));
-  }
-  let drew = false;
-  for (const rid of rootIds) { const node = buildNode(rid, comps, new Set()); if (node) { container.appendChild(node); drew = true; } }
-  return drew;
-}
+        <!-- KPI METRIC CARDS (6-Grid) -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div class="glass-card p-4 rounded-2xl">
+            <div class="text-xs text-slate-400 flex items-center justify-between">
+              <span>CMS 30d Adherence</span>
+              <span class="material-symbols-outlined text-sky-400 text-base">verified</span>
+            </div>
+            <div class="text-2xl font-extrabold text-white mt-1" id="kpi-cms">92.9%</div>
+            <div class="text-[11px] text-emerald-400 mt-1" id="kpi-cms-sub">13/14 nights ≥ 4.0h</div>
+          </div>
 
-// Fallback: pull every Text value out of the messages as plain text.
-function flattenText(messages) {
-  const out = [];
-  for (const m of messages) {
-    const su = m.surfaceUpdate;
-    if (su && Array.isArray(su.components)) for (const c of su.components) if (c && c.component && c.component.Text) out.push(boundStr(c.component.Text.text));
-  }
-  return out.join("\n").trim();
-}
+          <div class="glass-card p-4 rounded-2xl">
+            <div class="text-xs text-slate-400 flex items-center justify-between">
+              <span>Mean AHI (7d)</span>
+              <span class="material-symbols-outlined text-emerald-400 text-base">monitoring</span>
+            </div>
+            <div class="text-2xl font-extrabold text-white mt-1" id="kpi-ahi">2.8 <span class="text-xs font-normal text-slate-400">/hr</span></div>
+            <div class="text-[11px] text-emerald-400 mt-1" id="kpi-ahi-sub">Target &lt; 5.0 events/hr</div>
+          </div>
 
-function renderReply(b, parts) {
-  b.textContent = "";   // clear the "…" placeholder
-  const texts = parts.filter(p => p && (p.kind === "text" || (!p.kind && p.text))).map(p => p.text || "");
-  const a2ui = parts.filter(p => p && p.kind === "a2ui" && p.data).map(p => p.data);
+          <div class="glass-card p-4 rounded-2xl">
+            <div class="text-xs text-slate-400 flex items-center justify-between">
+              <span>Snoring Score</span>
+              <span class="material-symbols-outlined text-amber-400 text-base">graphic_eq</span>
+            </div>
+            <div class="text-2xl font-extrabold text-white mt-1" id="kpi-snore">2.6 <span class="text-xs font-normal text-slate-400">/10</span></div>
+            <div class="text-[11px] text-sky-300 mt-1" id="kpi-snore-corr">Snore↔AHI r = 0.96</div>
+          </div>
 
-  const textStr = texts.join("\n").trim();
-  if (textStr) b.appendChild(el("div", null, textStr));
+          <div class="glass-card p-4 rounded-2xl">
+            <div class="text-xs text-slate-400 flex items-center justify-between">
+              <span>BMI &amp; Weight Trend</span>
+              <span class="material-symbols-outlined text-indigo-400 text-base">monitor_weight</span>
+            </div>
+            <div class="text-2xl font-extrabold text-white mt-1" id="kpi-bmi">29.5</div>
+            <div class="text-[11px] text-indigo-300 mt-1" id="kpi-weight-corr">Weight↔AHI r = 0.89</div>
+          </div>
 
-  if (a2ui.length) {
-    b.classList.add("rich");
-    if (!renderSurface(a2ui, b)) b.appendChild(el("div", null, flattenText(a2ui) || "(no card content)"));
-  }
-  if (!b.childNodes.length) b.textContent = "(no response)";
-  log.scrollTop = log.scrollHeight;
-}
+          <div class="glass-card p-4 rounded-2xl">
+            <div class="text-xs text-slate-400 flex items-center justify-between">
+              <span>STOP-BANG Risk</span>
+              <span class="material-symbols-outlined text-rose-400 text-base">health_and_safety</span>
+            </div>
+            <div class="text-2xl font-extrabold text-amber-400 mt-1" id="kpi-stopbang">5 / 8</div>
+            <div class="text-[11px] text-slate-300 mt-1" id="kpi-ess">ESS Score: 10/24</div>
+          </div>
 
-// The proxy returns { parts: [{kind:"text",text} | {kind:"a2ui",data}] }.
-form.addEventListener("submit", async (ev) => {
-  ev.preventDefault();
-  const text = input.value.trim();
-  if (!text) return;
-  bubble("user").textContent = text;
-  input.value = "";
-  const b = bubble("agent"); b.textContent = "…";
-  try {
-    const res = await fetch("/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: text }) });
-    // Read as text first, then parse. If the proxy ever returns a non-JSON error
-    // page (e.g. a plain "Internal Server Error"), show that body instead of a
-    // cryptic "Unexpected token" JSON error.
-    const raw = await res.text();
-    let data;
-    try { data = JSON.parse(raw); }
-    catch { throw new Error(`Server returned non-JSON (HTTP ${res.status}). ${raw.slice(0, 300)}`); }
-    renderReply(b, data.parts || []);
-  } catch (e) {
-    b.textContent = "Error: " + e.message;
-  }
-});
-</script>
+          <div class="glass-card p-4 rounded-2xl">
+            <div class="text-xs text-slate-400 flex items-center justify-between">
+              <span>Smoke-Free Airway</span>
+              <span class="material-symbols-outlined text-emerald-400 text-base">smoke_free</span>
+            </div>
+            <div class="text-2xl font-extrabold text-emerald-400 mt-1" id="kpi-smoke">18 Days</div>
+            <div class="text-[11px] text-slate-400 mt-1">Lower mucosal edema</div>
+          </div>
+        </div>
+
+        <!-- DUAL INTERACTIVE CHARTS: AHI vs SNORING & WEIGHT/BMI vs AHI -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="glass-card p-5 rounded-2xl">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-bold text-white text-base">Nightly AHI vs. Snoring Severity &amp; CPAP Usage</h3>
+                <p class="text-xs text-slate-400">14-day clinical trajectory showing how side-sleeping &amp; CPAP reduce snoring &amp; AHI</p>
+              </div>
+              <span class="px-2.5 py-1 rounded-lg bg-sky-500/10 text-sky-300 text-xs font-semibold">14-Night Trend</span>
+            </div>
+            <div class="h-64">
+              <canvas id="chart-ahi-snore"></canvas>
+            </div>
+          </div>
+
+          <div class="glass-card p-5 rounded-2xl">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="font-bold text-white text-base">Body Weight / BMI Trajectory vs. Apnea-Hypopnea Index</h3>
+                <p class="text-xs text-slate-400">Demonstrates how a 2.1 kg weight reduction correlates with lower upper-airway collapse</p>
+              </div>
+              <span id="badge-corr-r" class="px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-300 text-xs font-semibold">Pearson r = +0.89</span>
+            </div>
+            <div class="h-64">
+              <canvas id="chart-weight-ahi"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- WEEKLY AI INSIGHT SUMMARY + RISK DRIVERS + SMART REMINDERS -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Weekly AI Insight Card -->
+          <div class="glass-card p-5 rounded-2xl lg:col-span-2 space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-sky-400">auto_awesome</span>
+                <h3 class="font-bold text-white text-base">Weekly AI Clinical &amp; Lifestyle Insight Summary</h3>
+              </div>
+              <span class="text-xs text-slate-400">Powered by SomnoCare Analytics</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-700/40">
+                <div class="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-2 flex items-center gap-1">
+                  <span class="material-symbols-outlined text-sm">trending_up</span> What Improved (Last 7d)
+                </div>
+                <ul id="insight-improved-list" class="text-xs text-slate-200 space-y-1.5 list-disc list-inside"></ul>
+              </div>
+
+              <div class="p-3.5 rounded-xl bg-amber-950/40 border border-amber-700/40">
+                <div class="text-xs font-bold uppercase tracking-wider text-amber-400 mb-2 flex items-center gap-1">
+                  <span class="material-symbols-outlined text-sm">warning</span> What Slipped / Watch Areas
+                </div>
+                <ul id="insight-slipped-list" class="text-xs text-slate-200 space-y-1.5 list-disc list-inside"></ul>
+              </div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-sky-950/50 border border-sky-700/50">
+              <div class="text-xs font-bold uppercase tracking-wider text-sky-300 mb-1 flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">lightbulb</span> One High-Impact Thing to Try Tonight
+              </div>
+              <p id="insight-try-text" class="text-xs text-slate-200 leading-relaxed"></p>
+            </div>
+
+            <!-- Gamification Badges -->
+            <div>
+              <div class="text-xs font-semibold text-slate-400 mb-2">Earned Adherence &amp; Lifestyle Badges</div>
+              <div id="badges-container" class="flex flex-wrap gap-2"></div>
+            </div>
+          </div>
+
+          <!-- Transparent Risk Drivers & Supply Reminders -->
+          <div class="glass-card p-5 rounded-2xl space-y-4">
+            <div>
+              <h3 class="font-bold text-white text-base flex items-center gap-2">
+                <span class="material-symbols-outlined text-amber-400">radar</span> Transparent Risk Drivers
+              </h3>
+              <p class="text-xs text-slate-400 mt-0.5">Active factors driving your STOP-BANG wellness score:</p>
+              <div id="risk-drivers-list" class="mt-3 space-y-1.5 text-xs"></div>
+            </div>
+
+            <hr class="border-slate-800" />
+
+            <div>
+              <h4 class="font-bold text-white text-sm flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-sky-400 text-base">inventory_2</span> Smart DME Supply Reminders
+              </h4>
+              <div id="supply-reminders-list" class="mt-2.5 space-y-2 text-xs"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =============================================================== -->
+      <!-- TAB 2: PROFILE, BMI, SMOKING, STOP-BANG & ESS SCREENING         -->
+      <!-- =============================================================== -->
+      <section id="tab-profile" class="tab-pane hidden space-y-6">
+        <div>
+          <h2 class="text-2xl font-bold text-white">Patient Anthropometrics, Smoking &amp; Clinical Screening</h2>
+          <p class="text-sm text-slate-400">Stored in Firestore <code class="text-sky-300">patient_profile</code>. Automatically recalculates BMI, Smoke-Free Streak, STOP-BANG (0–8), and Epworth Sleepiness Scale (0–24).</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Profile Form (Age, BMI, Neck Size, Smoking) -->
+          <div class="glass-card p-6 rounded-2xl space-y-4">
+            <h3 class="font-bold text-lg text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-sky-400">person_edit</span> 1. Profile, BMI &amp; Smoking Tracker
+            </h3>
+            <form id="profile-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div>
+                <label class="block text-slate-400 mb-1">Patient Name</label>
+                <input type="text" id="pf-name" class="form-input w-full" value="Arjun Mehta" />
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Age (Years) <span class="text-amber-400">[STOP-BANG &gt;50]</span></label>
+                <input type="number" id="pf-age" class="form-input w-full" value="52" min="18" max="100" />
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Biological Sex</label>
+                <select id="pf-sex" class="form-input w-full">
+                  <option value="male">Male (STOP-BANG +1)</option>
+                  <option value="female">Female</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Height (cm)</label>
+                <input type="number" step="0.1" id="pf-height" class="form-input w-full" value="175" />
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Current Weight (kg)</label>
+                <input type="number" step="0.1" id="pf-weight" class="form-input w-full" value="90.3" />
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Target Weight (kg)</label>
+                <input type="number" step="0.1" id="pf-target-weight" class="form-input w-full" value="82.0" />
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Neck Circumference (cm) <span class="text-amber-400">[&gt;40 cm]</span></label>
+                <input type="number" step="0.1" id="pf-neck" class="form-input w-full" value="41.5" />
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">City (for Weather &amp; AQI)</label>
+                <input type="text" id="pf-city" class="form-input w-full" value="Bengaluru" />
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Smoking Status</label>
+                <select id="pf-smoking" class="form-input w-full">
+                  <option value="former">Former Smoker (Tracking Streak)</option>
+                  <option value="never">Never Smoked</option>
+                  <option value="current">Current Smoker</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Quit Date (for Smoke-Free Streak)</label>
+                <input type="date" id="pf-quit-date" class="form-input w-full" />
+              </div>
+              <div class="sm:col-span-2 flex items-center gap-3 pt-2">
+                <button type="submit" class="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold transition">
+                  Save Profile &amp; Recalculate BMI / STOP-BANG
+                </button>
+                <span id="pf-save-status" class="text-emerald-400 font-medium"></span>
+              </div>
+            </form>
+
+            <div class="p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-xs space-y-1.5">
+              <div class="font-bold text-sky-300">Clinical Smoking &amp; Upper Airway Context (Verified):</div>
+              <p class="text-slate-300 leading-relaxed" id="pf-smoking-context">
+                Epidemiological data from the Wisconsin Sleep Cohort Study (Wetter et al., Arch Intern Med) shows current smokers have ~3.0x higher odds of moderate-to-severe OSA compared to never-smokers due to pharyngeal mucosal edema and mucociliary impairment. Sustaining your smoke-free streak directly reduces morning mouth dryness and nasal mask resistance.
+              </p>
+            </div>
+          </div>
+
+          <!-- STOP-BANG & ESS Interactive Questionnaires -->
+          <div class="glass-card p-6 rounded-2xl space-y-5">
+            <div class="flex items-center justify-between">
+              <h3 class="font-bold text-lg text-white flex items-center gap-2">
+                <span class="material-symbols-outlined text-amber-400">fact_check</span> 2. STOP-BANG &amp; Epworth (ESS) Screening
+              </h3>
+              <span id="sb-live-pill" class="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold">Score: 5/8 (High)</span>
+            </div>
+
+            <div class="space-y-2.5 text-xs">
+              <p class="text-slate-400">Toggle the 4 subjective STOP questions below (B, A, N, G are auto-computed from your profile):</p>
+              <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-800 cursor-pointer">
+                <span><strong>S — Snoring:</strong> Do you snore loudly (louder than talking or heard through closed doors)?</span>
+                <input type="checkbox" id="sb-q-snore" checked class="w-4 h-4 accent-sky-500" />
+              </label>
+              <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-800 cursor-pointer">
+                <span><strong>T — Tired:</strong> Do you often feel tired, fatigued, or sleepy during the daytime?</span>
+                <input type="checkbox" id="sb-q-tired" checked class="w-4 h-4 accent-sky-500" />
+              </label>
+              <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-800 cursor-pointer">
+                <span><strong>O — Observed:</strong> Has anyone observed you stop breathing or gasping during your sleep?</span>
+                <input type="checkbox" id="sb-q-observed" class="w-4 h-4 accent-sky-500" />
+              </label>
+              <label class="flex items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-800 cursor-pointer">
+                <span><strong>P — Pressure:</strong> Do you have or are you being treated for high blood pressure (hypertension)?</span>
+                <input type="checkbox" id="sb-q-bp" checked class="w-4 h-4 accent-sky-500" />
+              </label>
+            </div>
+
+            <!-- Epworth Sleepiness Scale Sliders -->
+            <div class="space-y-2 text-xs pt-2 border-t border-slate-800">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-slate-200">Epworth Sleepiness Scale (ESS — 0 to 3 chance of dozing)</span>
+                <span id="ess-live-pill" class="text-sky-400 font-bold">ESS: 10/24</span>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div class="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800 flex justify-between items-center">
+                  <span>1. Sitting &amp; reading</span>
+                  <input type="number" min="0" max="3" value="2" class="ess-input w-12 text-center bg-slate-800 rounded p-1" />
+                </div>
+                <div class="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800 flex justify-between items-center">
+                  <span>2. Watching TV</span>
+                  <input type="number" min="0" max="3" value="2" class="ess-input w-12 text-center bg-slate-800 rounded p-1" />
+                </div>
+                <div class="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800 flex justify-between items-center">
+                  <span>3. Sitting inactive in public</span>
+                  <input type="number" min="0" max="3" value="1" class="ess-input w-12 text-center bg-slate-800 rounded p-1" />
+                </div>
+                <div class="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800 flex justify-between items-center">
+                  <span>4. Passenger in car (1 hr)</span>
+                  <input type="number" min="0" max="3" value="2" class="ess-input w-12 text-center bg-slate-800 rounded p-1" />
+                </div>
+                <div class="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800 flex justify-between items-center">
+                  <span>5. Lying down in afternoon</span>
+                  <input type="number" min="0" max="3" value="2" class="ess-input w-12 text-center bg-slate-800 rounded p-1" />
+                </div>
+                <div class="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800 flex justify-between items-center">
+                  <span>6. Sitting &amp; talking</span>
+                  <input type="number" min="0" max="3" value="0" class="ess-input w-12 text-center bg-slate-800 rounded p-1" />
+                </div>
+                <div class="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800 flex justify-between items-center">
+                  <span>7. Quietly after lunch</span>
+                  <input type="number" min="0" max="3" value="1" class="ess-input w-12 text-center bg-slate-800 rounded p-1" />
+                </div>
+                <div class="p-2.5 rounded-lg bg-rose-950/40 border border-rose-800/50 flex justify-between items-center">
+                  <span class="text-rose-200">8. In car stopped in traffic ⚠️</span>
+                  <input type="number" min="0" max="3" value="0" class="ess-input w-12 text-center bg-slate-800 rounded p-1" />
+                </div>
+              </div>
+              <button onclick="submitScreening()" class="w-full mt-2 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold transition">
+                Evaluate STOP-BANG &amp; ESS Risk Profile
+              </button>
+              <div id="screening-result-box" class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =============================================================== -->
+      <!-- TAB 3: SLEEP, ACOUSTIC SNORING DETECTOR & MULTILINGUAL VOICE LOG -->
+      <!-- =============================================================== -->
+      <section id="tab-snoring" class="tab-pane hidden space-y-6">
+        <div>
+          <h2 class="text-2xl font-bold text-white">Nightly CPAP, On-Device Acoustic Snore Analyzer &amp; Voice Logger</h2>
+          <p class="text-sm text-slate-400">All sleep audio is processed 100% locally in your browser via Web Audio FFT — only summary snore minutes &amp; dB levels are saved.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- On-Device Acoustic Snore Detector + Multilingual Voice Logger -->
+          <div class="space-y-6">
+            <!-- Acoustic Snore Detector Card -->
+            <div class="glass-card p-6 rounded-2xl space-y-4">
+              <div class="flex items-center justify-between">
+                <h3 class="font-bold text-lg text-white flex items-center gap-2">
+                  <span class="material-symbols-outlined text-amber-400">graphic_eq</span> On-Device Acoustic Snore Detector
+                </h3>
+                <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 text-[11px] font-semibold">🔒 Privacy: On-Device DSP</span>
+              </div>
+              <p class="text-xs text-slate-400">Uses Web Audio API frequency-band energy analysis (100–600 Hz palatal/pharyngeal snore band) to classify snore bursts vs. ambient room noise in real time.</p>
+
+              <canvas id="snore-Visualizer" width="520" height="110" class="w-full rounded-xl bg-slate-950 border border-slate-800"></canvas>
+
+              <div class="grid grid-cols-3 gap-3 text-center text-xs">
+                <div class="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                  <div class="text-slate-400">Live Loudness</div>
+                  <div class="text-xl font-bold text-white mt-0.5" id="snore-live-db">38 dB</div>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                  <div class="text-slate-400">Snore Events</div>
+                  <div class="text-xl font-bold text-amber-400 mt-0.5" id="snore-live-events">0</div>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                  <div class="text-slate-400">Computed Score</div>
+                  <div class="text-xl font-bold text-sky-400 mt-0.5" id="snore-live-score">1 / 10</div>
+                </div>
+              </div>
+
+              <div class="flex gap-3">
+                <button id="btn-snore-toggle" onclick="toggleSnoreDetector()" class="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold flex items-center justify-center gap-2 transition">
+                  <span class="material-symbols-outlined text-base">mic</span> Start Live Acoustic Snore Monitor
+                </button>
+                <button onclick="simulateSnoreBurst()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition">
+                  Simulate Snore Burst (Demo)
+                </button>
+              </div>
+            </div>
+
+            <!-- Hands-Free Multilingual Voice Assistant -->
+            <div class="glass-card p-6 rounded-2xl space-y-4">
+              <div class="flex items-center justify-between">
+                <h3 class="font-bold text-lg text-white flex items-center gap-2">
+                  <span class="material-symbols-outlined text-sky-400">record_voice_over</span> Hands-Free Voice Sleep Logging
+                </h3>
+                <select id="voice-lang" class="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-200">
+                  <option value="en-IN">English (India / US)</option>
+                  <option value="hi-IN">हिन्दी (Hindi)</option>
+                  <option value="kn-IN">ಕನ್ನಡ (Kannada)</option>
+                  <option value="te-IN">తెలుగు (Telugu)</option>
+                </select>
+              </div>
+              <p class="text-xs text-slate-400">Say e.g. <em>"Log 7.5 hours, AHI 2.1, snoring score 2, slept on my side, weight 89.8 kg"</em> or type below:</p>
+              <div class="flex gap-2">
+                <input type="text" id="voice-transcript-input" class="form-input flex-1 text-xs" placeholder="Log 7.5 hours, AHI 2.1, leak 4.2, snoring score 2, side sleeping..." />
+                <button onclick="startVoiceRecognition()" id="btn-voice-mic" class="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center gap-1">
+                  <span class="material-symbols-outlined text-base">mic</span> Speak
+                </button>
+                <button onclick="submitVoiceTranscript()" class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold">
+                  AI Parse &amp; Log
+                </button>
+              </div>
+              <div id="voice-parse-status" class="text-xs text-emerald-400"></div>
+            </div>
+          </div>
+
+          <!-- Manual / Detailed Nightly Log Form -->
+          <div class="glass-card p-6 rounded-2xl space-y-4">
+            <h3 class="font-bold text-lg text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-indigo-400">bedtime</span> Structured Nightly CPAP &amp; Lifestyle Entry
+            </h3>
+            <form id="sleep-log-form" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+              <div>
+                <label class="block text-slate-400 mb-1">Session Date</label>
+                <input type="date" id="sl-date" class="form-input w-full" />
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">CPAP Usage Hours</label>
+                <input type="number" step="0.1" id="sl-hours" value="7.5" class="form-input w-full" />
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">AHI (Events / Hour)</label>
+                <input type="number" step="0.1" id="sl-ahi" value="2.1" class="form-input w-full" />
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Mask Leak Rate (L/min)</label>
+                <input type="number" step="0.1" id="sl-leak" value="4.2" class="form-input w-full" />
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Snoring Score (0–10)</label>
+                <input type="number" min="0" max="10" id="sl-snore" value="2" class="form-input w-full" />
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Dominant Sleep Position</label>
+                <select id="sl-position" class="form-input w-full">
+                  <option value="side">Side Sleeping (Recommended for OSA)</option>
+                  <option value="back">Back / Supine (Higher Airway Gravity Load)</option>
+                  <option value="mixed">Mixed Position</option>
+                  <option value="stomach">Stomach / Prone</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Evening Alcohol (Drinks)</label>
+                <input type="number" min="0" max="10" id="sl-alcohol" value="0" class="form-input w-full" />
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Daily Caffeine (mg)</label>
+                <input type="number" step="20" id="sl-caffeine" value="80" class="form-input w-full" />
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Morning Restedness (1–10)</label>
+                <input type="number" min="1" max="10" id="sl-rested" value="9" class="form-input w-full" />
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Morning Weight (kg)</label>
+                <input type="number" step="0.1" id="sl-weight" value="90.1" class="form-input w-full" />
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-slate-400 mb-1">Notes / Symptoms (Checked for Safety Red Flags)</label>
+                <input type="text" id="sl-notes" placeholder="e.g., Slept on left side, comfortable humidity, no dry mouth" class="form-input w-full" />
+              </div>
+              <div class="sm:col-span-2">
+                <button type="submit" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition">
+                  Save Nightly Session to Firestore &amp; Refresh Charts
+                </button>
+              </div>
+            </form>
+            <div id="sl-feedback-box" class="text-xs text-slate-300 space-y-1"></div>
+          </div>
+        </div>
+
+        <!-- Historical Log Table -->
+        <div class="glass-card p-5 rounded-2xl overflow-x-auto">
+          <h3 class="font-bold text-base text-white mb-3">Recent Nightly Sleep, Snoring &amp; Positional Logs</h3>
+          <table class="w-full text-left text-xs">
+            <thead class="text-slate-400 border-b border-slate-800">
+              <tr>
+                <th class="py-2 pr-3">Date</th>
+                <th class="py-2 pr-3">Usage (h)</th>
+                <th class="py-2 pr-3">AHI</th>
+                <th class="py-2 pr-3">Leak (L/m)</th>
+                <th class="py-2 pr-3">Snore (0–10)</th>
+                <th class="py-2 pr-3">Position</th>
+                <th class="py-2 pr-3">Alcohol</th>
+                <th class="py-2 pr-3">Weight (kg)</th>
+                <th class="py-2">Notes</th>
+              </tr>
+            </thead>
+            <tbody id="sleep-logs-tbody" class="divide-y divide-slate-800/60 text-slate-200"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- =============================================================== -->
+      <!-- TAB 4: OPENCV / MEDIAPIPE POSE EXERCISE, YOGA & THROAT COACH    -->
+      <!-- =============================================================== -->
+      <section id="tab-exercise" class="tab-pane hidden space-y-6">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 class="text-2xl font-bold text-white">OpenCV / MediaPipe Pose Exercise, Yoga &amp; Oropharyngeal Coach</h2>
+            <p class="text-sm text-slate-400">Real-time browser-based skeletal joint-angle tracking, automatic rep counting, live posture cues, and supportive OSA throat exercises.</p>
+          </div>
+          <span class="px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 text-xs font-semibold" id="ex-age-guide">Age-Tuned Zone: 84–117 bpm</span>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Live Camera / Pose Skeleton Canvas -->
+          <div class="glass-card p-5 rounded-2xl lg:col-span-2 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <select id="pose-exercise-select" onchange="changePoseExercise()" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs font-semibold text-white">
+                  <option value="bodyweight_squat">1. Bodyweight Squat (Knee Angle &lt;100° Rep Counter)</option>
+                  <option value="push_up">2. Incline / Standard Push-Up (Elbow Angle Tracking)</option>
+                  <option value="yoga_bridge_setu_bandhasana">3. Yoga: Setu Bandhasana (Bridge Pose Hip Alignment)</option>
+                  <option value="yoga_cat_cow">4. Yoga: Cat-Cow Thoracic &amp; Airway Expansion</option>
+                  <option value="oropharyngeal_tongue_slide">5. OSA Oropharyngeal: Tongue Slide &amp; Soft Palate Lift</option>
+                </select>
+              </div>
+              <div class="flex gap-2">
+                <button id="btn-webcam-pose" onclick="toggleWebcamPose()" class="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold flex items-center gap-1">
+                  <span class="material-symbols-outlined text-sm">videocam</span> Live Webcam Pose
+                </button>
+                <button id="btn-sim-pose" onclick="toggleSimulatedPose()" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1">
+                  <span class="material-symbols-outlined text-sm">play_circle</span> Interactive Skeleton Sim
+                </button>
+                <button onclick="saveCompletedWorkout()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1">
+                  <span class="material-symbols-outlined text-sm">check_circle</span> Log Workout
+                </button>
+              </div>
+            </div>
+
+            <!-- Video + Overlay Canvas -->
+            <div class="relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 aspect-video flex items-center justify-center">
+              <video id="pose-video" class="hidden w-full h-full object-cover" playsinline muted></video>
+              <canvas id="pose-canvas" width="720" height="405" class="w-full h-full object-contain"></canvas>
+              <!-- Live Coaching Overlay Pill -->
+              <div class="absolute bottom-3 left-3 right-3 flex items-center justify-between px-4 py-2.5 rounded-xl bg-slate-900/90 backdrop-blur border border-slate-700 text-xs">
+                <div class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                  <span id="pose-live-cue" class="font-bold text-white">Ready: Click 'Interactive Skeleton Sim' or 'Live Webcam Pose' to begin real-time joint angle tracking.</span>
+                </div>
+                <span id="pose-joint-angle" class="font-mono text-sky-400 font-bold">Angle: 168°</span>
+              </div>
+            </div>
+
+            <!-- Live Rep & Form Telemetry -->
+            <div class="grid grid-cols-4 gap-3 text-center text-xs">
+              <div class="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                <div class="text-slate-400">Completed Reps</div>
+                <div class="text-2xl font-extrabold text-white mt-0.5" id="pose-reps">0</div>
+              </div>
+              <div class="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                <div class="text-slate-400">Pose Accuracy</div>
+                <div class="text-2xl font-extrabold text-emerald-400 mt-0.5" id="pose-accuracy">95%</div>
+              </div>
+              <div class="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                <div class="text-slate-400">Session Timer</div>
+                <div class="text-2xl font-extrabold text-sky-400 mt-0.5" id="pose-timer">00:00</div>
+              </div>
+              <div class="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                <div class="text-slate-400">Phase State</div>
+                <div class="text-lg font-bold text-amber-300 mt-1" id="pose-stage">EXTENSION</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Oropharyngeal (Throat) Guide + Exercise Log History -->
+          <div class="glass-card p-5 rounded-2xl space-y-4">
+            <h3 class="font-bold text-base text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-emerald-400">record_voice_over</span> Oropharyngeal (Throat) OSA Protocol
+            </h3>
+            <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs space-y-2">
+              <p class="text-amber-300 font-semibold">Supportive Therapy (Not a Standalone Cure):</p>
+              <p class="text-slate-300 leading-relaxed">
+                Clinical trials (Guimarães et al., <em>AJRCCM</em>) suggest myofunctional throat exercises may reduce snoring and mild-to-moderate OSA severity by toning upper airway dilator muscles:
+              </p>
+              <ol class="list-decimal list-inside space-y-1.5 text-slate-200">
+                <li><strong>Tongue Slide (20 reps):</strong> Press tongue tip against hard palate and slide backward along roof of mouth.</li>
+                <li><strong>Palatal Tongue Suction (20 reps):</strong> Suck entire tongue upward against palate, holding 5 seconds.</li>
+                <li><strong>Soft Palate Lift (20 reps):</strong> Elevate uvula and soft palate while intermittently saying <em>"Ahhh"</em>.</li>
+                <li><strong>Buccal Cheek Resistance (10/side):</strong> Press finger gently against inner cheek while contracting buccinator muscle.</li>
+              </ol>
+            </div>
+
+            <div>
+              <h4 class="font-bold text-sm text-white mb-2">Recent Logged Exercise &amp; Yoga Sessions</h4>
+              <div id="exercise-history-list" class="space-y-2 text-xs max-h-60 overflow-y-auto"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =============================================================== -->
+      <!-- TAB 5: PRANAYAMA BREATHING, DIET / MEAL LOGGER & CLIMATE AQI    -->
+      <!-- =============================================================== -->
+      <section id="tab-lifestyle" class="tab-pane hidden space-y-6">
+        <div>
+          <h2 class="text-2xl font-bold text-white">Guided Pranayama Breathing, Sleep-Friendly Diet &amp; Bedroom Climate</h2>
+          <p class="text-sm text-slate-400">Parasympathetic wind-down timer, late/spicy meal reflux guard, and live Open-Meteo Humidity + Air Quality (AQI) CPAP tuner.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Animated Pranayama & Box Breathing Pacer -->
+          <div class="glass-card p-6 rounded-2xl flex flex-col items-center text-center space-y-4">
+            <h3 class="font-bold text-lg text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-sky-400">spa</span> Guided Pranayama &amp; Box Breathing
+            </h3>
+            <p class="text-xs text-slate-400">4-7-8 Parasympathetic Wind-Down or 4-4-4-4 Box Breathing to ease CPAP mask acclimation</p>
+
+            <select id="breath-mode" class="bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white">
+              <option value="4-7-8">4-7-8 Sleep Wind-Down Pranayama</option>
+              <option value="4-4-4-4">4-4-4-4 Navy Box Breathing (Mask Calm)</option>
+            </select>
+
+            <div class="relative w-44 h-44 flex items-center justify-center my-2">
+              <div id="breath-circle" class="w-28 h-28 rounded-full bg-gradient-to-br from-sky-500/40 to-indigo-600/40 border-2 border-sky-400 flex items-center justify-center transition-all duration-1000">
+                <span id="breath-label" class="font-bold text-sm text-white">Ready</span>
+              </div>
+            </div>
+
+            <button id="btn-breath-toggle" onclick="toggleBreathingTimer()" class="w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition">
+              Start Guided Breathing Session
+            </button>
+          </div>
+
+          <!-- Sleep-Friendly Diet & Photo Meal Logger -->
+          <div class="glass-card p-6 rounded-2xl space-y-4">
+            <h3 class="font-bold text-lg text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-emerald-400">restaurant</span> Sleep-Friendly Meal &amp; Photo Logger
+            </h3>
+            <p class="text-xs text-slate-400">Flags late or spicy meals (&lt;2h before sleep) that trigger reflux &amp; airway edema. Calorie numbers are estimates.</p>
+
+            <form id="meal-form" class="space-y-3 text-xs">
+              <div>
+                <label class="block text-slate-400 mb-1">Meal Description</label>
+                <input type="text" id="meal-desc" value="Grilled fish with steamed vegetables and quinoa" class="form-input w-full" />
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-slate-400 mb-1">Estimated Calories (kcal)</label>
+                  <input type="number" id="meal-cal" value="480" class="form-input w-full" />
+                </div>
+                <div>
+                  <label class="block text-slate-400 mb-1">Hours Before Bedtime</label>
+                  <input type="number" step="0.5" id="meal-hours-bed" value="3.0" class="form-input w-full" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Optional Meal Photo (Gemini Multimodal Estimate)</label>
+                <input type="file" id="meal-photo" accept="image/*" class="text-xs text-slate-400" />
+              </div>
+              <button type="submit" class="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition">
+                Analyze &amp; Log Meal Impact
+              </button>
+            </form>
+            <div id="meal-list" class="space-y-2 text-xs max-h-40 overflow-y-auto"></div>
+          </div>
+
+          <!-- Live Ambient Weather, Humidity & AQI Tuner -->
+          <div class="glass-card p-6 rounded-2xl space-y-4">
+            <h3 class="font-bold text-lg text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-amber-400">thermostat</span> Bedroom Climate, Rainout &amp; AQI Tuner
+            </h3>
+            <div class="flex gap-2">
+              <input type="text" id="weather-city-input" value="Bengaluru" class="form-input flex-1 text-xs" placeholder="Enter city..." />
+              <button onclick="fetchWeatherAndAQI()" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold">
+                Check Live
+              </button>
+            </div>
+            <div id="weather-result-card" class="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs space-y-2">
+              <div class="text-slate-400">Click 'Check Live' to query Open-Meteo Weather &amp; Air Quality APIs.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =============================================================== -->
+      <!-- TAB 6: CARE TEAM, PARTNER LOG, SLEEP STUDY UPLOAD & CLINICS     -->
+      <!-- =============================================================== -->
+      <section id="tab-careteam" class="tab-pane hidden space-y-6">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 class="text-2xl font-bold text-white">Physician Report, Partner View, Sleep Study Parser &amp; Clinics</h2>
+            <p class="text-sm text-slate-400">Share clinical trends with your sleep doctor, log bed-partner observations, extract PDF sleep studies, or find nearby sleep labs.</p>
+          </div>
+          <a href="/api/doctor-report.pdf" target="_blank" class="px-4 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg">
+            <span class="material-symbols-outlined text-base">download</span> Download Weekly Doctor Report (PDF)
+          </a>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Caregiver / Bed Partner Observation Log -->
+          <div class="glass-card p-6 rounded-2xl space-y-4">
+            <h3 class="font-bold text-lg text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-pink-400">favorite</span> Caregiver / Partner Observation
+            </h3>
+            <p class="text-xs text-slate-400">A partner witnessing breathing pauses automatically updates the STOP-BANG 'Observed Apnea' factor.</p>
+            <form id="partner-form" class="space-y-3 text-xs">
+              <div>
+                <label class="block text-slate-400 mb-1">Observer Name &amp; Relation</label>
+                <input type="text" id="po-name" value="Priya (Spouse)" class="form-input w-full" />
+              </div>
+              <label class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                <span>Observed Breathing Pauses (Apnea)?</span>
+                <input type="checkbox" id="po-pauses" class="w-4 h-4 accent-rose-500" />
+              </label>
+              <label class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                <span>Observed Gasping or Choking?</span>
+                <input type="checkbox" id="po-gasping" class="w-4 h-4 accent-rose-500" />
+              </label>
+              <div>
+                <label class="block text-slate-400 mb-1">Partner Notes</label>
+                <input type="text" id="po-notes" value="Slept quietly on left side; no mask whistling." class="form-input w-full" />
+              </div>
+              <button type="submit" class="w-full py-2.5 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-semibold transition">
+                Save Partner Observation
+              </button>
+            </form>
+            <div id="partner-log-list" class="space-y-2 text-xs"></div>
+          </div>
+
+          <!-- Sleep Study PDF Document Upload & AI Extractor -->
+          <div class="glass-card p-6 rounded-2xl space-y-4">
+            <h3 class="font-bold text-lg text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-indigo-400">upload_file</span> Sleep Study (PSG) PDF Extractor
+            </h3>
+            <p class="text-xs text-slate-400">Upload a Polysomnography or Home Sleep Apnea Test (HSAT) PDF/text report to extract Diagnostic AHI &amp; SpO<sub>2</sub> Nadir.</p>
+            <form id="psg-upload-form" class="space-y-3 text-xs">
+              <input type="file" id="psg-file" accept=".pdf,.txt" class="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-slate-800 file:text-sky-300" />
+              <button type="submit" class="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition">
+                Extract AHI &amp; Oxygen Nadir with Gemini
+              </button>
+            </form>
+            <div id="psg-extract-result" class="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300">
+              Upload any sleep report PDF (or click Extract to test with sample clinical report).
+            </div>
+
+            <hr class="border-slate-800" />
+            <!-- Privacy & Consent Controls -->
+            <div class="space-y-2 text-xs">
+              <div class="font-bold text-slate-200 flex items-center gap-1">
+                <span class="material-symbols-outlined text-emerald-400 text-sm">lock</span> Trust, Privacy &amp; Data Controls
+              </div>
+              <p class="text-slate-400">Webcam pose landmarks and microphone snore FFT run strictly in-browser. You can reset your stored profile and logs at any time:</p>
+              <button onclick="resetAllUserData()" class="px-3 py-1.5 rounded-lg bg-rose-950 hover:bg-rose-900 border border-rose-700 text-rose-200 font-semibold">
+                Reset / Delete My Stored Wellness Data
+              </button>
+            </div>
+          </div>
+
+          <!-- Find Nearby Sleep Specialists & Labs -->
+          <div class="glass-card p-6 rounded-2xl space-y-4">
+            <h3 class="font-bold text-lg text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-emerald-400">location_on</span> Find Accredited Sleep Clinics
+            </h3>
+            <div class="flex gap-2">
+              <input type="text" id="clinic-city-input" value="Bengaluru" class="form-input flex-1 text-xs" />
+              <button onclick="searchSleepClinics()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold">
+                Search
+              </button>
+            </div>
+            <div id="clinics-list" class="space-y-2.5 text-xs"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =============================================================== -->
+      <!-- TAB 7: SOMNOCARE GEMINI AI AGENT & A2UI RICH CARD CHAT          -->
+      <!-- =============================================================== -->
+      <section id="tab-agent" class="tab-pane hidden space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 class="text-2xl font-bold text-white">SomnoCare Conversational Gemini Agent &amp; CPAP Troubleshooter</h2>
+            <p class="text-sm text-slate-400">Wired to all 12 Firestore &amp; clinical tools with A2UI v0.8 rich card rendering and red-flag safety protection.</p>
+          </div>
+          <div class="flex flex-wrap gap-1.5 text-xs">
+            <button onclick="sendQuickPrompt('Evaluate my STOP-BANG score, BMI trend, and smoke-free streak')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-sky-300 font-medium">Check Risk &amp; STOP-BANG</button>
+            <button onclick="sendQuickPrompt('Check my 30-day Medicare CMS compliance and weight-to-AHI correlation')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300 font-medium">CMS Compliance &amp; Corr</button>
+            <button onclick="sendQuickPrompt('Give me my Weekly AI Insight Summary: what improved, what slipped, and one thing to try')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-indigo-300 font-medium">Weekly AI Summary</button>
+            <button onclick="sendQuickPrompt('My mask is leaking and I have dry mouth in the morning. Check Bengaluru weather and troubleshoot.')" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 font-medium">Troubleshoot Leak &amp; Dry Mouth</button>
+          </div>
+        </div>
+
+        <div class="glass-card rounded-2xl flex flex-col h-[540px] overflow-hidden">
+          <div id="log" class="flex-1 overflow-y-auto p-5 space-y-3"></div>
+          <form id="form" class="p-3.5 bg-slate-900/90 border-t border-slate-800 flex gap-2">
+            <input id="input" class="form-input flex-1 text-sm" placeholder="Ask SomnoCare Agent about your BMI, STOP-BANG score, snoring trend, mask fit, or log a session..." autocomplete="off" />
+            <button type="submit" class="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold text-sm flex items-center gap-1">
+              <span>Send</span>
+              <span class="material-symbols-outlined text-base">send</span>
+            </button>
+          </form>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="/app.js"></script>
 </body>
 </html>

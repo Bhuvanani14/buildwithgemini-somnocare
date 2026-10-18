@@ -80,7 +80,9 @@ app: FastAPI = get_fast_api_app(
 app.title = "somnocare"
 app.description = "API for interacting with the SomnoCare Agent"
 
+from app.api_routes import router as wellness_router  # noqa: E402
 
+app.include_router(wellness_router)
 
 # Proxy routes so the Vertex AI Console Playground (reasoning_engine SDK) can
 # talk to this agent alongside the native adk_api routes.

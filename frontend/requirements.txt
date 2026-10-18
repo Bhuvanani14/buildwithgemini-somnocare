@@ -1,5 +1,10 @@
-fastapi
-uvicorn[standard]
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
 a2a-sdk>=1.0
-httpx
-google-auth
+httpx>=0.27.0
+google-auth>=2.30.0
+google-genai>=1.0.0
+python-dotenv>=1.0.0
+python-multipart>=0.0.9
+reportlab>=4.0.0
+PyPDF2>=3.0.0
