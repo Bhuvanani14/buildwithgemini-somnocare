@@ -221,7 +221,11 @@ node_modules/
 application_default_credentials.json
 *-sa-key.json
 service-account*.json
-# Keep the demo GIF (README embeds it); ignore the large raw recording.
+# Keep the demo GIF (README embeds it); ignore raw temp recordings except the final submission demo video.
 *.webm
+!submission/SomnoCare_Demo_Video.webm
+!SomnoCare_Demo_Video.webm
+.netlify/
 data/
+
 

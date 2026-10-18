@@ -1,10 +1,133 @@
 /* ============================================================================
- * SomnoCare v2.0 — Interactive Clinical, Risk, Snore, Pose & A2UI Frontend
+ * SomnoCare v2.0 — Simple, Accessible, Secure Light/Dark Clinical Frontend
  * ========================================================================== */
 
 let chartAhiSnore = null;
 let chartWeightAhi = null;
 let dashboardState = null;
+let authToken = localStorage.getItem('somnocare_token') || '';
+let currentUserId = localStorage.getItem('somnocare_user_id') || 'default_user';
+
+function authHeaders(extra = {}) {
+  const h = { ...extra };
+  if (authToken) h['Authorization'] = 'Bearer ' + authToken;
+  return h;
+}
+
+// Light / Dark Mode Theme Toggle
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('somnocare_theme', theme);
+  const icon = document.getElementById('theme-icon');
+  const label = document.getElementById('theme-label');
+  if (icon && label) {
+    if (theme === 'dark') {
+      icon.textContent = 'light_mode';
+      label.textContent = 'Light Mode';
+    } else {
+      icon.textContent = 'dark_mode';
+      label.textContent = 'Dark Mode';
+    }
+  }
+  if (dashboardState && dashboardState.sleep_logs) {
+    renderCharts(dashboardState.sleep_logs);
+  }
+}
+
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme') || 'light';
+  applyTheme(cur === 'light' ? 'dark' : 'light');
+}
+
+// Authentication & Personalization Modal
+function switchAuthMode(mode) {
+  const loginForm = document.getElementById('login-form');
+  const regForm = document.getElementById('register-form');
+  const tabLogin = document.getElementById('tab-auth-login');
+  const tabReg = document.getElementById('tab-auth-register');
+  document.getElementById('auth-status-msg').textContent = '';
+  if (mode === 'register') {
+    loginForm.classList.add('hidden');
+    regForm.classList.remove('hidden');
+    tabReg.className = 'py-2 rounded-lg bg-sky-600 text-white';
+    tabLogin.className = 'py-2 rounded-lg sc-muted';
+  } else {
+    regForm.classList.add('hidden');
+    loginForm.classList.remove('hidden');
+    tabLogin.className = 'py-2 rounded-lg bg-sky-600 text-white';
+    tabReg.className = 'py-2 rounded-lg sc-muted';
+  }
+}
+
+function openSignInModal() {
+  document.getElementById('auth-modal').classList.remove('hidden');
+}
+
+async function quickDemoLogin() {
+  document.getElementById('login-email').value = 'arjun@somnocare.ai';
+  document.getElementById('login-password').value = 'SomnoCare@2026';
+  await performLogin('arjun@somnocare.ai', 'SomnoCare@2026');
+}
+
+async function performLogin(email, password) {
+  const res = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (data.status === 'success') {
+    authToken = data.token;
+    currentUserId = data.user.user_id;
+    localStorage.setItem('somnocare_token', authToken);
+    localStorage.setItem('somnocare_user_id', currentUserId);
+    document.getElementById('auth-modal').classList.add('hidden');
+    await loadDashboard();
+  } else {
+    document.getElementById('auth-status-msg').textContent = data.message || 'Sign-in failed.';
+  }
+}
+
+function lockSession() {
+  document.getElementById('pin-unlock-msg').textContent = '';
+  document.getElementById('pin-lock-modal').classList.remove('hidden');
+}
+
+async function unlockWithPin() {
+  const pin = document.getElementById('pin-unlock-input').value;
+  const res = await fetch('/api/auth/verify-pin', {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ user_id: currentUserId, pin }),
+  });
+  const data = await res.json();
+  if (data.verified) {
+    document.getElementById('pin-lock-modal').classList.add('hidden');
+    await loadDashboard();
+  } else {
+    document.getElementById('pin-unlock-msg').textContent = data.message || 'Incorrect PIN.';
+  }
+}
+
+async function saveSecuritySettings() {
+  const cam = document.getElementById('sec-consent-cam')?.checked ?? true;
+  const mic = document.getElementById('sec-consent-mic')?.checked ?? true;
+  const newPin = document.getElementById('sec-new-pin')?.value || '';
+  const res = await fetch('/api/security/settings', {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      user_id: currentUserId,
+      new_pin: newPin || undefined,
+      privacy_consents: { camera_pose_tracking: cam, microphone_snore_dsp: mic },
+    }),
+  });
+  const data = await res.json();
+  const msg = document.getElementById('sec-save-msg');
+  if (msg) msg.textContent = '✓ ' + (data.message || 'Saved');
+  if (newPin) document.getElementById('sec-new-pin').value = '';
+  await loadDashboard();
+}
 
 // Tab Switching
 function switchTab(tabId) {
@@ -12,7 +135,7 @@ function switchTab(tabId) {
   const target = document.getElementById('tab-' + tabId);
   if (target) target.classList.remove('hidden');
 
-  document.querySelectorAll('#sidebar-nav .nav-btn').forEach(btn => {
+  document.querySelectorAll('#sidebar-nav .nav-pill').forEach(btn => {
     if (btn.getAttribute('data-tab') === tabId) btn.classList.add('active');
     else btn.classList.remove('active');
   });
@@ -37,7 +160,9 @@ function showRedFlagAlert(safetyObj) {
 // ============================================================================
 async function loadDashboard() {
   try {
-    const res = await fetch('/api/dashboard');
+    const res = await fetch(`/api/dashboard?user_id=${encodeURIComponent(currentUserId)}`, {
+      headers: authHeaders(),
+    });
     const data = await res.json();
     dashboardState = data;
 
@@ -97,8 +222,8 @@ async function loadDashboard() {
     badgesBox.innerHTML = '';
     ((ins.streaks_and_badges && ins.streaks_and_badges.badges) || []).forEach(b => {
       const span = document.createElement('span');
-      span.className = 'px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/40 text-indigo-200 text-xs font-semibold flex items-center gap-1';
-      span.innerHTML = `<span class="material-symbols-outlined text-sm text-amber-400">workspace_premium</span> ${b}`;
+      span.className = 'px-3 py-1.5 rounded-full bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 text-xs font-bold flex items-center gap-1';
+      span.innerHTML = `<span class="material-symbols-outlined text-sm text-amber-500">workspace_premium</span> ${b}`;
       badgesBox.appendChild(span);
     });
 
@@ -107,8 +232,8 @@ async function loadDashboard() {
     driversBox.innerHTML = '';
     (sb.active_drivers || []).forEach(d => {
       const div = document.createElement('div');
-      div.className = 'px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-800 text-amber-200 flex items-center gap-2';
-      div.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span> <span>${d}</span>`;
+      div.className = 'px-3 py-2 sc-subtle font-medium flex items-center gap-2';
+      div.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500"></span> <span>${d}</span>`;
       driversBox.appendChild(div);
     });
 
@@ -118,14 +243,32 @@ async function loadDashboard() {
     (ins.supply_reminders || []).forEach(r => {
       const isDue = r.status === 'DUE_SOON';
       const div = document.createElement('div');
-      div.className = 'flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800';
+      div.className = 'flex items-center justify-between p-2.5 sc-subtle';
       div.innerHTML = `
         <span><strong>${r.component}</strong> (${r.days_used}/${r.interval_days}d)</span>
-        <span class="px-2 py-0.5 rounded font-semibold ${isDue ? 'bg-rose-500/20 text-rose-300' : 'bg-emerald-500/15 text-emerald-300'}">
+        <span class="px-2 py-0.5 rounded font-bold ${isDue ? 'bg-rose-500/20 text-rose-600' : 'bg-emerald-500/15 text-emerald-600'}">
           ${r.days_remaining}d left
         </span>`;
       remBox.appendChild(div);
     });
+
+    // Security Audit Trail
+    const auditBox = document.getElementById('security-audit-list');
+    if (auditBox && data.security) {
+      auditBox.innerHTML = '';
+      (data.security.audit_logs || []).forEach(ev => {
+        const row = document.createElement('div');
+        row.className = 'p-2 sc-subtle flex justify-between items-center';
+        row.innerHTML = `
+          <div>
+            <div class="font-bold">${ev.action}</div>
+            <div class="sc-muted">${ev.details || ''}</div>
+          </div>
+          <span class="px-2 py-0.5 rounded font-bold ${ev.status === 'SUCCESS' ? 'bg-emerald-500/15 text-emerald-600' : 'bg-rose-500/15 text-rose-600'}">${ev.status}</span>
+        `;
+        auditBox.appendChild(row);
+      });
+    }
 
     // Populate Profile Form
     document.getElementById('pf-name').value = p.name || 'Arjun Mehta';
@@ -141,11 +284,11 @@ async function loadDashboard() {
     if (scr.smoking_clinical_context) document.getElementById('pf-smoking-context').textContent = scr.smoking_clinical_context;
 
     document.getElementById('sb-live-pill').textContent = `Score: ${sb.score ?? 5}/8 (${sb.risk_level || 'High'})`;
-    document.getElementById('ess-live-pill').textContent = `ESS: ${ess.score ?? 10}/24`;
+    document.getElementById('ess-live-pill').textContent = `ESS: ${ess.score ?? 10}/24 ▼`;
     document.getElementById('screening-result-box').textContent = `${sb.clinical_guidance || ''} — ${ess.guidance || ''}`;
 
     if (p.exercise_intensity_guide) {
-      document.getElementById('ex-age-guide').textContent = `Age ${p.age}y Target HR: ${p.exercise_intensity_guide.moderate_zone_bpm}`;
+      document.getElementById('ex-age-guide').textContent = `Age ${p.age}y Safe HR Zone: ${p.exercise_intensity_guide.moderate_zone_bpm}`;
     }
 
     // Populate Sleep Logs Table & Charts
@@ -160,6 +303,11 @@ async function loadDashboard() {
 }
 
 function renderCharts(logs) {
+  const isDark = (document.documentElement.getAttribute('data-theme') || 'light') === 'dark';
+  const tickCol = isDark ? '#94a3b8' : '#475569';
+  const legendCol = isDark ? '#e2e8f0' : '#0f172a';
+  const gridCol = isDark ? 'rgba(51,65,85,0.35)' : 'rgba(203,213,225,0.6)';
+
   const chrono = [...logs].reverse();
   const labels = chrono.map(r => (r.date || '').slice(5));
   const ahis = chrono.map(r => r.ahi);
@@ -175,27 +323,27 @@ function renderCharts(logs) {
       labels,
       datasets: [
         {
-          label: 'AHI (events/hr)',
+          label: 'Breathing Pauses (AHI / hr)',
           data: ahis,
-          borderColor: '#38bdf8',
-          backgroundColor: 'rgba(56, 189, 248, 0.15)',
+          borderColor: '#0284c7',
+          backgroundColor: 'rgba(2, 132, 199, 0.14)',
           tension: 0.35,
           fill: true,
           borderWidth: 2.5,
         },
         {
-          label: 'Snoring Score (0-10)',
+          label: 'Snoring Level (0-10)',
           data: snores,
-          borderColor: '#f59e0b',
-          backgroundColor: 'rgba(245, 158, 11, 0.1)',
+          borderColor: '#d97706',
+          backgroundColor: 'rgba(217, 119, 6, 0.1)',
           tension: 0.35,
           borderDash: [5, 4],
           borderWidth: 2,
         },
         {
-          label: 'CPAP Usage (hrs)',
+          label: 'CPAP Hours Used',
           data: hours,
-          borderColor: '#10b981',
+          borderColor: '#059669',
           tension: 0.35,
           borderWidth: 2,
         },
@@ -204,10 +352,10 @@ function renderCharts(logs) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: '#cbd5e1', font: { size: 11 } } } },
+      plugins: { legend: { labels: { color: legendCol, font: { size: 11, weight: 'bold' } } } },
       scales: {
-        x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.3)' } },
-        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.3)' } },
+        x: { ticks: { color: tickCol }, grid: { color: gridCol } },
+        y: { ticks: { color: tickCol }, grid: { color: gridCol } },
       },
     },
   });
@@ -222,17 +370,17 @@ function renderCharts(logs) {
         {
           label: 'Body Weight (kg)',
           data: weights,
-          borderColor: '#818cf8',
-          backgroundColor: 'rgba(129, 140, 248, 0.15)',
+          borderColor: '#4f46e5',
+          backgroundColor: 'rgba(79, 70, 229, 0.12)',
           yAxisID: 'yWeight',
           tension: 0.35,
           fill: true,
           borderWidth: 2.5,
         },
         {
-          label: 'AHI (events/hr)',
+          label: 'Breathing Pauses (AHI)',
           data: ahis,
-          borderColor: '#f43f5e',
+          borderColor: '#e11d48',
           yAxisID: 'yAhi',
           tension: 0.35,
           borderWidth: 2,
@@ -242,19 +390,19 @@ function renderCharts(logs) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: '#cbd5e1', font: { size: 11 } } } },
+      plugins: { legend: { labels: { color: legendCol, font: { size: 11, weight: 'bold' } } } },
       scales: {
-        x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(51,65,85,0.3)' } },
+        x: { ticks: { color: tickCol }, grid: { color: gridCol } },
         yWeight: {
           type: 'linear',
           position: 'left',
-          ticks: { color: '#818cf8' },
-          grid: { color: 'rgba(51,65,85,0.3)' },
+          ticks: { color: '#4f46e5' },
+          grid: { color: gridCol },
         },
         yAhi: {
           type: 'linear',
           position: 'right',
-          ticks: { color: '#f43f5e' },
+          ticks: { color: '#e11d48' },
           grid: { drawOnChartArea: false },
         },
       },
@@ -268,15 +416,15 @@ function renderSleepLogsTable(logs) {
   logs.forEach(r => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="py-2 pr-3 font-medium">${r.date || ''}</td>
-      <td class="py-2 pr-3 ${r.usage_hours >= 4 ? 'text-emerald-400 font-semibold' : 'text-rose-400'}">${r.usage_hours}h</td>
-      <td class="py-2 pr-3 ${r.ahi < 5 ? 'text-sky-300' : 'text-amber-300 font-bold'}">${r.ahi}</td>
-      <td class="py-2 pr-3">${r.mask_leak_rate} L/m</td>
-      <td class="py-2 pr-3">${r.snoring_score ?? 2}/10 (${r.snore_minutes ?? 10}m)</td>
-      <td class="py-2 pr-3 capitalize">${r.sleep_position || 'side'}</td>
-      <td class="py-2 pr-3">${r.alcohol_units || 0}</td>
-      <td class="py-2 pr-3">${r.weight_kg || '-'}</td>
-      <td class="py-2 text-slate-400">${r.notes || ''}</td>
+      <td class="py-2.5 pr-3 font-semibold">${r.date || ''}</td>
+      <td class="py-2.5 pr-3 ${r.usage_hours >= 4 ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold'}">${r.usage_hours}h</td>
+      <td class="py-2.5 pr-3 ${r.ahi < 5 ? 'text-sky-600 font-bold' : 'text-amber-600 font-bold'}">${r.ahi}</td>
+      <td class="py-2.5 pr-3">${r.mask_leak_rate} L/m</td>
+      <td class="py-2.5 pr-3">${r.snoring_score ?? 2}/10</td>
+      <td class="py-2.5 pr-3 capitalize">${r.sleep_position || 'side'}</td>
+      <td class="py-2.5 pr-3">${r.alcohol_units || 0}</td>
+      <td class="py-2.5 pr-3">${r.weight_kg || '-'} kg</td>
+      <td class="py-2.5 sc-muted">${r.notes || ''}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -287,15 +435,15 @@ function renderExerciseHistory(exercises) {
   box.innerHTML = '';
   exercises.forEach(ex => {
     const d = document.createElement('div');
-    d.className = 'p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between';
+    d.className = 'p-2.5 sc-subtle flex items-center justify-between';
     d.innerHTML = `
       <div>
-        <div class="font-semibold text-white">${ex.exercise_type.replace(/_/g, ' ')}</div>
-        <div class="text-[11px] text-slate-400">${ex.date} • ${ex.category || 'Exercise'}</div>
+        <div class="font-bold capitalize">${ex.exercise_type.replace(/_/g, ' ')}</div>
+        <div class="text-[11px] sc-muted">${ex.date} • ${ex.category || 'Exercise'}</div>
       </div>
       <div class="text-right">
-        <div class="font-bold text-emerald-400">${ex.reps} reps • ${ex.form_accuracy_score}%</div>
-        <div class="text-[11px] text-slate-400">${ex.duration_seconds}s</div>
+        <div class="font-extrabold text-emerald-600">${ex.reps} reps • ${ex.form_accuracy_score}%</div>
+        <div class="text-[11px] sc-muted">${ex.duration_seconds}s</div>
       </div>`;
     box.appendChild(d);
   });
@@ -306,13 +454,13 @@ function renderMealsList(meals) {
   box.innerHTML = '';
   meals.forEach(m => {
     const d = document.createElement('div');
-    d.className = 'p-2.5 rounded-xl bg-slate-900 border border-slate-800 space-y-1';
+    d.className = 'p-2.5 sc-subtle space-y-1';
     d.innerHTML = `
-      <div class="flex justify-between font-semibold text-white">
+      <div class="flex justify-between font-bold">
         <span>${m.description}</span>
-        <span class="text-sky-400">~${m.estimated_calories} kcal</span>
+        <span class="text-sky-600">~${m.estimated_calories} kcal</span>
       </div>
-      <div class="text-[11px] text-slate-300">${m.sleep_impact_tip || ''}</div>`;
+      <div class="text-[11px] sc-muted">${m.sleep_impact_tip || ''}</div>`;
     box.appendChild(d);
   });
 }
@@ -322,13 +470,13 @@ function renderPartnerLogs(items) {
   box.innerHTML = '';
   items.forEach(p => {
     const d = document.createElement('div');
-    d.className = 'p-2.5 rounded-xl bg-slate-900 border border-slate-800';
+    d.className = 'p-2.5 sc-subtle';
     d.innerHTML = `
-      <div class="flex justify-between font-semibold">
-        <span class="text-pink-300">${p.observer_name} (${p.date})</span>
+      <div class="flex justify-between font-bold">
+        <span class="text-pink-600">${p.observer_name} (${p.date})</span>
         <span>${p.observed_apnea_pauses ? '⚠️ Pauses Seen' : '✅ Quiet Breathing'}</span>
       </div>
-      <div class="text-[11px] text-slate-400 mt-0.5">${p.notes || ''}</div>`;
+      <div class="text-[11px] sc-muted mt-0.5">${p.notes || ''}</div>`;
     box.appendChild(d);
   });
 }
@@ -864,24 +1012,24 @@ document.getElementById('meal-form').addEventListener('submit', async e => {
 async function fetchWeatherAndAQI() {
   const city = document.getElementById('weather-city-input').value || 'Bengaluru';
   const card = document.getElementById('weather-result-card');
-  card.innerHTML = `<div class="text-sky-400">Querying Open-Meteo Weather &amp; Air Quality for ${city}...</div>`;
+  card.innerHTML = `<div class="text-sky-600 font-semibold">Checking Weather &amp; Air Quality for ${city}...</div>`;
   const res = await fetch(`/api/weather?city=${encodeURIComponent(city)}`);
   const w = await res.json();
   if (w.status === 'error') {
-    card.innerHTML = `<div class="text-rose-400">${w.message}</div>`;
+    card.innerHTML = `<div class="text-rose-600 font-semibold">${w.message}</div>`;
     return;
   }
   card.innerHTML = `
-    <div class="flex justify-between items-center font-bold text-white text-sm">
+    <div class="flex justify-between items-center font-extrabold text-sm">
       <span>📍 ${w.location}</span>
-      <span class="text-sky-400">${w.temperature_celsius}°C (${w.temperature_fahrenheit}°F)</span>
+      <span class="text-sky-600">${w.temperature_celsius}°C (${w.temperature_fahrenheit}°F)</span>
     </div>
-    <div class="flex gap-3 text-xs mt-1">
-      <span class="px-2 py-0.5 rounded bg-sky-500/15 text-sky-300">💧 Humidity: ${w.relative_humidity_percent}%</span>
-      <span class="px-2 py-0.5 rounded bg-amber-500/15 text-amber-300">🌫️ US AQI: ${w.us_aqi ?? '38'} (PM2.5: ${w.pm2_5_ug_m3 ?? '9.2'} µg/m³)</span>
+    <div class="flex flex-wrap gap-2 text-xs mt-1">
+      <span class="px-2.5 py-1 rounded-md bg-sky-500/15 text-sky-600 font-bold">💧 Humidity: ${w.relative_humidity_percent}%</span>
+      <span class="px-2.5 py-1 rounded-md bg-amber-500/15 text-amber-600 font-bold">🌫️ US AQI: ${w.us_aqi ?? '38'} (PM2.5: ${w.pm2_5_ug_m3 ?? '9.2'} µg/m³)</span>
     </div>
-    <div class="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 mt-2">${w.cpap_climate_tip}</div>
-    <div class="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-emerald-300">${w.air_quality_nasal_tip}</div>
+    <div class="p-2.5 rounded-lg sc-subtle text-xs font-medium mt-2">${w.cpap_climate_tip}</div>
+    <div class="p-2.5 rounded-lg sc-subtle text-emerald-600 text-xs font-semibold">${w.air_quality_nasal_tip}</div>
   `;
 }
 
@@ -895,7 +1043,7 @@ document.getElementById('partner-form').addEventListener('submit', async e => {
   };
   await fetch('/api/partner-observation', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify(payload),
   });
   await loadDashboard();
@@ -918,7 +1066,7 @@ document.getElementById('psg-upload-form').addEventListener('submit', async e =>
   const data = await res.json();
   const ex = data.extracted_sleep_study || {};
   document.getElementById('psg-extract-result').innerHTML = `
-    <div class="font-bold text-indigo-300">Extracted from ${ex.filename}:</div>
+    <div class="font-bold text-indigo-600">Extracted from ${ex.filename}:</div>
     <div>• <strong>Diagnostic AHI:</strong> ${ex.diagnostic_ahi} events/hr</div>
     <div>• <strong>Lowest SpO2 Nadir:</strong> ${ex.spo2_nadir_percent}%</div>
     <div>• <strong>Clinical Impression:</strong> ${ex.impression}</div>
@@ -936,12 +1084,12 @@ async function searchSleepClinics() {
   box.innerHTML = '';
   (data.clinics || []).forEach(c => {
     const d = document.createElement('div');
-    d.className = 'p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1';
+    d.className = 'p-3 rounded-xl sc-subtle space-y-1';
     d.innerHTML = `
-      <div class="font-bold text-white">${c.name}</div>
-      <div class="text-slate-400">${c.locality}</div>
-      <div class="text-sky-300">${c.specialties}</div>
-      <a href="${c.maps_url}" target="_blank" class="inline-block mt-1 text-emerald-400 hover:underline font-semibold">Open in Google Maps →</a>
+      <div class="font-extrabold text-sm">${c.name}</div>
+      <div class="sc-muted text-xs">${c.locality}</div>
+      <div class="text-sky-600 font-semibold text-xs">${c.specialties}</div>
+      <a href="${c.maps_url}" target="_blank" class="inline-block mt-1 text-emerald-600 hover:underline font-bold text-xs">Open in Google Maps →</a>
     `;
     box.appendChild(d);
   });
@@ -950,8 +1098,8 @@ async function searchSleepClinics() {
 async function resetAllUserData() {
   await fetch('/api/privacy/reset', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: 'default_user' }),
+    headers: authHeaders(),
+    body: JSON.stringify({ user_id: currentUserId }),
   });
   await loadDashboard();
 }
@@ -1150,10 +1298,59 @@ form.addEventListener('submit', ev => {
 
 // Initialize on page load
 window.addEventListener('DOMContentLoaded', async () => {
+  const savedTheme = localStorage.getItem('somnocare_theme') || 'light';
+  applyTheme(savedTheme);
+
+  const loginForm = document.getElementById('login-form');
+  if (loginForm) {
+    loginForm.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      await performLogin(
+        document.getElementById('login-email').value,
+        document.getElementById('login-password').value
+      );
+    });
+  }
+
+  const regForm = document.getElementById('register-form');
+  if (regForm) {
+    regForm.addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: document.getElementById('reg-name').value,
+          email: document.getElementById('reg-email').value,
+          password: document.getElementById('reg-password').value,
+          age: parseInt(document.getElementById('reg-age').value, 10),
+          height_cm: parseFloat(document.getElementById('reg-height').value),
+          weight_kg: parseFloat(document.getElementById('reg-weight').value),
+          pin: document.getElementById('reg-pin').value,
+        }),
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        authToken = data.token;
+        currentUserId = data.user.user_id;
+        localStorage.setItem('somnocare_token', authToken);
+        localStorage.setItem('somnocare_user_id', currentUserId);
+        document.getElementById('auth-modal').classList.add('hidden');
+        await loadDashboard();
+      } else {
+        document.getElementById('auth-status-msg').textContent = data.message || 'Registration failed.';
+      }
+    });
+  }
+
+  if (authToken) {
+    document.getElementById('auth-modal').classList.add('hidden');
+  }
+
   document.getElementById('sl-date').value = new Date().toISOString().slice(0, 10);
   const b = bubble('agent');
   b.textContent =
-    'Hello Arjun! I am SomnoCare v2.0 — your CPAP Adherence, STOP-BANG Risk Screening, Acoustic Snore & OpenCV Pose Companion. Ask me anything or click a quick action above!';
+    'Hello! I am SomnoCare — your personal CPAP, Sleep Apnea Screening, Snoring & Exercise Coach. Tap any button above or ask me a question in plain English!';
   await loadDashboard();
   fetchWeatherAndAQI();
   searchSleepClinics();

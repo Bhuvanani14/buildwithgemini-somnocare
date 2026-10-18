@@ -44,6 +44,16 @@ app.add_middleware(
 app.include_router(wellness_router)
 
 
+@app.middleware("http")
+async def _security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    return response
+
+
 @app.exception_handler(Exception)
 async def _json_errors(request: Request, exc: Exception):
     return JSONResponse(

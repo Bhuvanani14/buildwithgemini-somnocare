@@ -165,6 +165,43 @@ class TestSomnoCareSuite(unittest.TestCase):
         chat_data = r_chat.json()
         self.assertTrue(chat_data.get("safety_alert", {}).get("has_red_flag"))
 
+    def test_authentication_and_security_controls(self) -> None:
+        r_login = self.client.post(
+            "/api/auth/login",
+            json={"email": "demo@somnocare.ai", "password": "SomnoCare2026!"},
+        )
+        self.assertEqual(r_login.status_code, 200)
+        login_data = r_login.json()
+        self.assertEqual(login_data["status"], "success")
+        self.assertIn("token", login_data)
+        self.assertEqual(r_login.headers.get("X-Content-Type-Options"), "nosniff")
+
+        r_pin = self.client.post(
+            "/api/auth/verify-pin",
+            json={"user_id": "default_user", "pin": "1404"},
+        )
+        self.assertEqual(r_pin.status_code, 200)
+        self.assertEqual(r_pin.json()["status"], "success")
+
+        r_reg = self.client.post(
+            "/api/auth/register",
+            json={
+                "name": "Test Patient",
+                "email": "patient.test@somnocare.ai",
+                "password": "SafePassword123!",
+                "age": 48,
+                "height_cm": 172.0,
+                "weight_kg": 84.0,
+                "pin": "2580",
+            },
+        )
+        self.assertEqual(r_reg.status_code, 200)
+        self.assertEqual(r_reg.json()["status"], "success")
+
+        r_audit = self.client.get("/api/security/audit")
+        self.assertEqual(r_audit.status_code, 200)
+        self.assertTrue(len(r_audit.json().get("logs", [])) >= 2)
+
 
 def test_dummy() -> None:
     """Backwards-compatible pytest entry point."""
@@ -175,3 +212,4 @@ def test_dummy() -> None:
 
 if __name__ == "__main__":
     unittest.main()
+

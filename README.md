@@ -1,112 +1,70 @@
-# SomnoCare v2.0 — Intelligent CPAP Therapy, OSA Risk Screening & Lifestyle Command Center
+# 🫁 SomnoCare — Simplified AI CPAP Adherence, Sleep Apnea Screening & Lifestyle Companion
 
-SomnoCare is an end-to-end clinical-guidance AI companion and wellness platform designed to assist Obstructive Sleep Apnea (OSA) patients with Continuous Positive Airway Pressure (CPAP) therapy, validated risk screening, acoustic snoring analysis, and biomechanical exercise coaching. Built using the **Google Agent Development Kit (ADK)**, **FastAPI**, and **Gemini**, SomnoCare unites nightly adherence tracking with a comprehensive **Risk & Lifestyle Layer**.
+[![Live Prototype](https://img.shields.io/badge/Live_Prototype-somnocare--ai.netlify.app-0284c7?style=for-the-badge&logo=googlecloud)](https://somnocare-ai.netlify.app)
+[![GitHub Repository](https://img.shields.io/badge/GitHub-Bhuvanani14%2Fsomnocare-0f172a?style=for-the-badge&logo=github)](https://github.com/Bhuvanani14/somnocare)
+[![Built with Google ADK & Gemini 2.5 Flash](https://img.shields.io/badge/Google_ADK-Gemini_2.5_Flash-10b981?style=for-the-badge&logo=google)](https://google.github.io/adk-docs/)
+[![Unit Tests](https://img.shields.io/badge/Tests-8%2F8_Passing-059669?style=for-the-badge)](./tests/unit/test_dummy.py)
 
----
-
-![SomnoCare Demo](demo.gif)
-
----
-
-## Key Capabilities & Features
-
-### 1. Risk & Lifestyle Profile Layer (`patient_profile` Collection)
-- **BMI & Weight Trajectory Tracking**: Computes Body Mass Index from height and weight, tracks historical trends, and calculates the **Pearson correlation ($r$) between weight change and AHI reduction**.
-- **Smoking & Airway Recovery Tracker**: Logs smoking status, cigarettes/day, and quit date; computes a live **Smoke-Free Streak** and surfaces verified clinical evidence (e.g., *Wisconsin Sleep Cohort Study*, Wetter et al.) linking smoking-induced mucosal edema to OSA severity and morning mask dryness.
-- **Official STOP-BANG Screening (0–8)**: Evaluates Snoring, Tiredness, Observed Apnea, Blood Pressure, BMI ($>35\text{ kg/m}^2$), Age ($>50$), Neck Circumference ($>40\text{ cm}$), and Biological Sex using the two-step Chung et al. clinical stratification (**Low / Intermediate / High**), showing transparent factor drivers.
-- **Epworth Sleepiness Scale (ESS, 0–24)**: 8-situation daytime somnolence questionnaire with automatic **Drowsy Driving Red-Flag Detection**.
-
-### 2. Acoustic Snoring Detector, Sleep Position & Nightly CPAP Logging (`sleep_therapy_logs`)
-- **On-Device Web Audio FFT Snore Analyzer**: Processes sleep audio 100% locally in the browser (100–600 Hz palatal/pharyngeal band) to detect snore bursts, dB loudness, and snore minutes without uploading raw bedroom audio.
-- **Positional & Evening Lifestyle Tracking**: Logs dominant sleep position (**Side vs. Back/Supine**), evening alcohol units, daily caffeine (mg), and morning dryness alongside CPAP usage hours, AHI, and mask leak rate (L/min).
-- **Dual Interactive Clinical Charts**: Visualizes **14-Night AHI vs. Snoring Score & Usage Hours** and **Body Weight / BMI vs. AHI Trajectory**.
-
-### 3. OpenCV / MediaPipe Pose Exercise, Yoga & Oropharyngeal Coach (`exercise_logs`)
-- **Real-Time Joint-Angle Biomechanics**: Browser-side skeletal tracking and interactive simulation with automatic rep counting and live posture cues (e.g., *"Raise your hips higher"*, *"Depth reached <100°"*).
-- **Age-Adapted Intensity**: Dynamically computes target heart rate zones ($220 - \text{Age}$) and recommends age-appropriate exercises.
-- **5 Curated OSA & Wellness Routines**:
-  1. **Bodyweight Squat** (Knee flexion angle $<100^\circ$)
-  2. **Incline / Standard Push-Up** (Elbow flexion angle)
-  3. **Yoga: Setu Bandhasana (Bridge Pose)** (Hip extension & thoracic airway expansion)
-  4. **Yoga: Cat-Cow (Marjaryasana-Bitilasana)** (Cervical & thoracic mobility)
-  5. **Supportive Oropharyngeal (Throat) Exercises** (Tongue slide, palatal suction, soft palate lift, and buccal resistance based on Guimarães et al., *AJRCCM*, presented as supportive care alongside CPAP).
-
-### 4. Lifestyle, Pranayama Breathing, Diet & Ambient Climate/AQI Tuner
-- **Guided Pranayama & Box Breathing Pacer**: Animated 4-7-8 parasympathetic wind-down and 4-4-4-4 Navy Box Breathing timer to ease mask claustrophobia and lower bedtime heart rate.
-- **Sleep-Friendly Meal & Photo Logger**: Logs meal timing and estimates calories (with optional **Gemini Multimodal Photo Analysis**), warning when late ($<2\text{h}$ before bed) or spicy meals increase gastroesophageal reflux and airway edema.
-- **Ambient Weather, Humidity & Air Quality (AQI / PM2.5)**: Extends the **Open-Meteo Weather & Air Quality APIs** to tune CPAP humidifier chamber levels, prevent tube condensation ("rainout"), and alert users when elevated PM2.5/AQI requires hypoallergenic filter checks and pre-bedtime saline nasal rinses.
-
-### 5. AI Upgrades, Care Team & Clinical Safety Guardrails
-- **Multilingual Hands-Free Voice Logging**: Dictate nightly logs in **English, Hindi, Kannada, or Telugu** (e.g., *"Log 7.5 hours, AHI 2.1, snoring score 2, side sleeping"*) parsed into structured Firestore entries by Gemini.
-- **Weekly AI Insight Summary**: Automatically synthesizes **What Improved**, **What Slipped**, and **One High-Impact Thing to Try**, plus **Gamification Badges** and **Smart DME Supply Replacement Reminders**.
-- **Weekly Doctor Report PDF Generator**: One-click clinical PDF (`/api/doctor-report.pdf` powered by ReportLab) containing anthropometrics, STOP-BANG/ESS scores, 30-day Medicare CMS compliance, correlations, and 10-day logs ready for a sleep physician.
-- **Caregiver / Bed-Partner View & Sleep Study PDF Extractor**: Partner observation form for witnessed apnea pauses (`partner_observations`) and a Polysomnography (PSG) PDF parser (`/api/upload-sleep-study`) that extracts diagnostic AHI and $\text{SpO}_2$ nadir.
-- **Find Nearby Sleep Clinics**: Curated sleep lab directory with direct Google Maps links.
-- **Deterministic Red-Flag Safety Rules**: Urgent alerts for chest pain, acute dyspnea, drowsy driving, severe residual AHI ($\ge 30$), or $\text{SpO}_2 < 85\%$, always framing outputs as *"wellness guidance, not a medical diagnosis"*.
+> **Live Deployed Prototype:** **[https://somnocare-ai.netlify.app](https://somnocare-ai.netlify.app)**  
+> **GitHub Repository:** **[https://github.com/Bhuvanani14/somnocare](https://github.com/Bhuvanani14/somnocare)**  
+> **Prescribed Pitch Deck (`.pptx`):** [`submission/SomnoCare_Pitch_Deck.pptx`](./submission/SomnoCare_Pitch_Deck.pptx)  
+> **Video Demonstration (3–4 Min):** [`submission/SomnoCare_Demo_Video.webm`](./submission/SomnoCare_Demo_Video.webm)  
+> **Submission Write-Up:** [`submission/SUBMISSION_DETAILS.md`](./submission/SUBMISSION_DETAILS.md)
 
 ---
 
-## Architecture & Wired Services
+## 🌟 Brief Description (Firebase, Firestore, Cloud Run & Gemini)
 
-| Capability | Component / Service | Implementation |
-| :--- | :--- | :--- |
-| **Foundation Model** | Gemini 3.8 Flash / Gemini 2.5 Flash | Core agent reasoning, tool calling, voice & PDF parsing |
-| **Image Model** | Gemini 3.1 Flash Lite Image (`gemini-3.1-flash-lite-image`) | On-demand CPAP equipment & mask fit diagrams |
-| **Long-Term Memory** | Vertex AI Memory Bank | `PreloadMemoryTool` + post-session memory callbacks |
-| **Database** | Google Cloud Firestore + Local Hybrid Mirror | `patient_profile`, `sleep_therapy_logs`, `cpap_supplies`, `exercise_logs`, `meal_logs`, `partner_observations` |
-| **Computer Vision & Audio** | MediaPipe Pose / Canvas + Web Audio FFT | Client-side joint-angle rep counter & acoustic snore detector |
-| **Physician Reporting** | ReportLab PDF Engine | Automated `/api/doctor-report.pdf` clinical summary |
-| **UI Protocol** | Modern Tailwind/Chart.js SPA + A2UI v0.8 | Interactive 7-tab command center + structured A2UI cards |
+**SomnoCare** transforms CPAP therapy management and Obstructive Sleep Apnea (OSA) risk screening into an **effortless, plain-language 5-step experience** built for everyday patients and older adults. It features **Light Mode (default) and Dark Mode**, **PBKDF2-SHA256 authentication**, **personalized account onboarding**, a **4-digit Privacy PIN lock screen**, and **100% on-device camera/microphone privacy**.
 
----
-
-## Project Structure
-
-```
-somnocare/
-├── app/
-│   ├── agent.py               # Root ADK agent, 12 clinical/lifestyle tools, callbacks & sandbox wiring
-│   ├── wellness_hub.py        # Hybrid Firestore/local storage & STOP-BANG, ESS, BMI, correlation calculators
-│   ├── api_routes.py          # FastAPI REST & multimodal endpoints (/api/dashboard, /api/doctor-report.pdf, etc.)
-│   ├── a2ui_utils.py          # A2UI v0.8 response formatting callback
-│   ├── fast_api_app.py        # ADK FastAPI serving app, wellness routes & A2A routing
-│   └── app_utils/             # Services registry and session management
-├── frontend/
-│   ├── main.py                # Unified FastAPI server hosting the SPA, REST APIs, and Agent chat
-│   ├── static/
-│   │   ├── index.html         # 7-tab responsive Command Center UI
-│   │   ├── app.css            # Glassmorphic dark clinical theme & A2UI styles
-│   │   └── app.js             # Chart.js trends, Web Audio snore FFT, Pose skeleton coach & voice logger
-│   └── requirements.txt       # Frontend & API dependencies
-├── seed_firestore.py          # Seeds CPAP supplies, patient profile, and 14 nights of clinical logs
-└── tests/unit/test_dummy.py   # Unit & API test suite covering calculators, tools, PDF export & red flags
-```
+### How SomnoCare Leverages Google Cloud & Gemini:
+- **Gemini 2.5 Flash & Google Agent Development Kit (`google-adk`, `google-genai`)**:
+  - Powers `somnocare_agent` ([`app/agent.py`](./app/agent.py)) with **12 specialized clinical tools** (`get_profile`, `update_profile`, `evaluate_osa_risk_and_screening`, `calculate_cms_adherence_compliance`, `log_sleep_therapy_entry`, `log_exercise_or_yoga_session`, `get_local_weather_for_humidifier`, `find_nearby_sleep_clinics`, `generate_weekly_wellness_insights`, etc.).
+  - Performs **multilingual natural-language voice sleep logging** (English, Hindi, Kannada, Telugu), **Sleep Study PDF/OCR extraction** (Diagnostic AHI & $\text{SpO}_2$ nadir), and renders structured **A2UI v0.8 visual cards** in chat.
+  - Enforces a deterministic **Red-Flag Clinical Safety Guard** that halts coaching and escalates to emergency/physician care if chest pain, syncope, drowsy driving, or $\text{AHI} \ge 30$ is detected.
+- **Firebase & Google Cloud Firestore (`google-cloud-firestore`)**:
+  - Persists longitudinal patient records across seven collections (`patient_profile`, `sleep_logs`, `exercise_logs`, `meal_logs`, `partner_observations`, `users_auth`, `security_audit_logs`) with a zero-downtime hybrid JSON fallback ([`app/wellness_hub.py`](./app/wellness_hub.py)) and an **ADK Session Memory Bank** ([`app/memory_bank.py`](./app/memory_bank.py)).
+- **Google Cloud Run (`Dockerfile`, `deploy_cloud_run.sh`)**:
+  - Stateless, containerized FastAPI + Uvicorn microservice serving the REST APIs, ADK Agent, ReportLab Physician PDF generator (`/api/doctor-report.pdf`), and simplified Light/Dark SPA on `$PORT=8080`.
 
 ---
 
-## Quick Start (Local Development)
+## ✨ Key Features (Simplified 5-Step Interface)
 
-### 1. Configure Environment
-Copy `.env.example` to `.env` and set either your `GEMINI_API_KEY` (Google AI Studio) or Google Cloud Vertex AI project credentials:
+| Step | Feature Area | What It Does |
+|---|---|---|
+| **Login & Security** | **Authentication, Personalization & PIN Lock** | Sign in (`arjun@somnocare.ai` / `SomnoCare@2026`), 1-Click Demo Login, Create Personalized Account, 4-Digit Privacy PIN Lock (`1404`), Granular Camera/Mic Consents & Security Audit Log. |
+| **Step 1** | **My Daily Summary (Light & Dark Mode)** | 5 plain-language health cards: **Insurance 4h/70% Status**, **Breathing Events (AHI)**, **BMI & Weight**, **STOP-BANG Risk**, and **Smoke-Free Streak**, plus 14-day trend charts & gamified badges. |
+| **Step 2** | **Log Sleep, Snoring & Voice** | **On-Device WebAudio FFT Snoring Detector** (80–350 Hz palatal band), **Multilingual Voice Logging** (EN/HI/KN/TE), and manual logging with sleep position (`side` vs. `back`) & alcohol/caffeine tracking. |
+| **Step 3** | **My Body, BMI, Smoking & Risk Check** | Tracks **Age**, **Height/Weight**, **BMI trend**, **Neck Circumference**, **Smoking Quit Streak**, official 8-item **STOP-BANG** questionnaire, and 8-item **Epworth Sleepiness Scale (ESS)**. |
+| **Step 4** | **OpenCV / MediaPipe Exercise, Yoga & Breathing** | Real-time 2D skeletal pose tracking & joint-angle rep counting (`calcAngleDegrees`) for **Bodyweight Squats**, **Push-ups**, **Yoga Bridge (*Setu Bandhasana*)**, **Cat-Cow**, and **Oropharyngeal Throat/Tongue Exercises**, plus **4-7-8 Pranayama** & **Open-Meteo Weather/AQI CPAP Humidifier Tuner**. |
+| **Step 5** | **Ask AI Coach, Doctor PDF & Security** | Conversational **Gemini 2.5 Flash Coach** with **A2UI v0.8 cards**, **Sleep Study PDF Extractor**, **Partner Observation Log**, **Nearby Sleep Clinics**, and **1-Click Physician PDF Report**. |
+
+---
+
+## 🚀 Quick Start (Local & Cloud Run)
+
+### 1. Run Locally
 ```bash
-cp .env.example .env
-```
-
-### 2. Run the Full-Stack Command Center
-```bash
-pip install -r frontend/requirements.txt
+pip install fastapi uvicorn google-genai google-adk google-cloud-firestore reportlab PyPDF2 python-multipart python-dotenv httpx
+export PORT=8085
 python frontend/main.py
 ```
-Open **http://localhost:8080** in your browser to explore:
-- **Risk & Trend Command** (KPIs, AHI vs. Snoring chart, Weight vs. AHI chart, Weekly AI Insights, Badges, Supply Reminders)
-- **Profile, STOP-BANG & ESS** (BMI calculator, Smoke-Free Streak, interactive STOP-BANG & Epworth questionnaires)
-- **Sleep, Snore & Voice Log** (On-device Web Audio snore visualizer, multilingual voice logging, positional/alcohol log)
-- **OpenCV Pose & Yoga Coach** (Real-time joint-angle rep counter for Squats, Push-Ups, Bridge Pose, Cat-Cow, and Oropharyngeal Throat exercises)
-- **Breathing, Diet & Climate** (Animated 4-7-8 Pranayama timer, Meal & Photo logger, live Open-Meteo Humidity + AQI tuner)
-- **Care Team, PDF & Clinics** (Downloadable Doctor PDF Report, Partner Observation log, Sleep Study PDF extractor, Sleep Clinic finder)
-- **SomnoCare Gemini Agent** (Conversational AI assistant with A2UI v0.8 rich card rendering)
+Open **[http://localhost:8085](http://localhost:8085)** in your browser.
+- **Demo Account:** `arjun@somnocare.ai` / `SomnoCare@2026` (or click **Instant 1-Click Demo Login**)
+- **Default 4-Digit Privacy PIN:** `1404`
 
-### 3. Run Unit & API Tests
+### 2. Run Unit & API Verification Suite
 ```bash
 python -m unittest tests/unit/test_dummy.py -v
+```
+
+### 3. Deploy to Google Cloud Run
+```bash
+chmod +x deploy_cloud_run.sh
+./deploy_cloud_run.sh
+```
+Or directly via `gcloud`:
+```bash
+gcloud run deploy somnocare --source . --region us-central1 --allow-unauthenticated --port 8080
 ```

@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#     https://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,19 +14,30 @@
 
 FROM python:3.12-slim
 
-RUN pip install --no-cache-dir uv==0.8.13
-
 WORKDIR /code
 
-COPY ./pyproject.toml ./README.md ./uv.lock* ./
+COPY ./pyproject.toml ./README.md ./
+
+RUN pip install --no-cache-dir \
+    fastapi>=0.115.0 \
+    uvicorn[standard]>=0.34.0 \
+    google-genai>=1.9.0 \
+    google-adk>=1.16.0 \
+    google-cloud-firestore>=2.19.0 \
+    google-cloud-logging>=3.12.0 \
+    reportlab>=4.2.0 \
+    PyPDF2>=3.0.0 \
+    python-multipart>=0.0.9 \
+    python-dotenv>=1.0.0 \
+    httpx>=0.27.0
 
 COPY ./app ./app
+COPY ./frontend ./frontend
+COPY ./data ./data
 
-RUN uv sync --frozen
-
-ARG AGENT_VERSION=0.0.0
-ENV AGENT_VERSION=${AGENT_VERSION}
+ENV PORT=8080
+ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8080
 
-CMD ["uv", "run", "uvicorn", "app.fast_api_app:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["python", "frontend/main.py"]

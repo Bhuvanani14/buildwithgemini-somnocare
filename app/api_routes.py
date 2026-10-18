@@ -24,11 +24,105 @@ from app.agent import (
     search_cpap_supplies,
     update_profile,
 )
+from app.security import (
+    authenticate_user,
+    ensure_default_user_account,
+    get_security_audit_logs,
+    log_security_event,
+    register_new_user,
+    update_security_settings,
+    verify_session_token,
+    verify_user_pin,
+)
 from app.wellness_hub import evaluate_safety_red_flags, get_store
 
 load_dotenv()
 
 router = APIRouter(prefix="/api")
+
+
+def _resolve_user_id(req: Optional[Request], explicit_user_id: Optional[str] = None) -> str:
+    """Resolve user_id from Bearer token if present, falling back to explicit_user_id or 'default_user'."""
+    if req is not None:
+        auth_header = req.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            claims = verify_session_token(auth_header[7:].strip())
+            if claims and claims.get("sub"):
+                return str(claims["sub"])
+    if explicit_user_id and explicit_user_id != "default_user":
+        return explicit_user_id
+    return explicit_user_id or "default_user"
+
+
+@router.post("/auth/login")
+async def api_auth_login(req: Request):
+    body = await req.json()
+    ip = req.client.host if req.client else "127.0.0.1"
+    return authenticate_user(
+        email_or_id=str(body.get("email", "arjun@somnocare.ai")),
+        password=str(body.get("password", "SomnoCare@2026")),
+        ip_address=ip,
+    )
+
+
+@router.post("/auth/register")
+async def api_auth_register(req: Request):
+    body = await req.json()
+    ip = req.client.host if req.client else "127.0.0.1"
+    return register_new_user(
+        name=str(body.get("name", "Patient")),
+        email=str(body.get("email", "")),
+        password=str(body.get("password", "")),
+        age=int(body.get("age", 48)),
+        sex=str(body.get("sex", "male")),
+        height_cm=float(body.get("height_cm", 172.0)),
+        weight_kg=float(body.get("weight_kg", 82.0)),
+        pin=str(body.get("pin", "1404")),
+        ip_address=ip,
+    )
+
+
+@router.post("/auth/verify-pin")
+async def api_auth_verify_pin(req: Request):
+    body = await req.json()
+    uid = _resolve_user_id(req, body.get("user_id"))
+    ip = req.client.host if req.client else "127.0.0.1"
+    return verify_user_pin(user_id=uid, pin=str(body.get("pin", "")), ip_address=ip)
+
+
+@router.get("/security/audit")
+async def api_security_audit(req: Request, user_id: str = "default_user"):
+    uid = _resolve_user_id(req, user_id)
+    account = ensure_default_user_account()
+    store = get_store()
+    u_doc = store.get_document("users_auth", uid) or account
+    logs = get_security_audit_logs(user_id=uid, limit=15)
+    return {
+        "status": "success",
+        "user": {
+            "user_id": u_doc.get("user_id", uid),
+            "name": u_doc.get("name", "Arjun Mehta"),
+            "email": u_doc.get("email", "arjun@somnocare.ai"),
+            "mfa_pin_enabled": u_doc.get("mfa_pin_enabled", True),
+            "privacy_consents": u_doc.get("privacy_consents", {}),
+            "last_login": u_doc.get("last_login"),
+        },
+        "audit_logs": logs,
+        "logs": logs,
+    }
+
+
+@router.post("/security/settings")
+async def api_security_settings(req: Request):
+    body = await req.json()
+    uid = _resolve_user_id(req, body.get("user_id"))
+    ip = req.client.host if req.client else "127.0.0.1"
+    return update_security_settings(
+        user_id=uid,
+        new_pin=body.get("new_pin"),
+        privacy_consents=body.get("privacy_consents"),
+        ip_address=ip,
+    )
 
 
 def _get_gemini_client():
@@ -47,7 +141,9 @@ def _get_gemini_client():
 # DASHBOARD OVERVIEW (SINGLE-CALL HYDRATION FOR FRONTEND)
 # =====================================================================
 @router.get("/dashboard")
-async def api_dashboard(user_id: str = "default_user"):
+async def api_dashboard(req: Request, user_id: str = "default_user"):
+    user_id = _resolve_user_id(req, user_id)
+    ensure_default_user_account()
     store = get_store()
     profile = get_profile(user_id=user_id)
     logs = get_sleep_therapy_history(user_id=user_id, limit=14)
@@ -61,6 +157,8 @@ async def api_dashboard(user_id: str = "default_user"):
     partner_logs = store.list_collection("partner_observations", user_id=user_id)
     partner_logs.sort(key=lambda x: str(x.get("date", "")), reverse=True)
     supplies = search_cpap_supplies()
+    audit_logs = get_security_audit_logs(user_id=user_id, limit=10)
+    u_auth = store.get_document("users_auth", user_id) or ensure_default_user_account()
 
     return {
         "status": "success",
@@ -73,6 +171,12 @@ async def api_dashboard(user_id: str = "default_user"):
         "meals": meals,
         "partner_observations": partner_logs,
         "supplies": supplies,
+        "security": {
+            "email": u_auth.get("email", "arjun@somnocare.ai"),
+            "mfa_pin_enabled": u_auth.get("mfa_pin_enabled", True),
+            "privacy_consents": u_auth.get("privacy_consents", {}),
+            "audit_logs": audit_logs,
+        },
     }
 
 
