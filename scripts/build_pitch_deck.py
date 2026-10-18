@@ -268,7 +268,7 @@ def build_pitch_deck() -> None:
         s1.shapes[1],
         [
             "Participant Details",
-            "Participant Name: Bhuvanani Vattikonda",
+            "Participant / Presenter Names: Bhuvanani Vattikonda & Darshan Gowda",
             "Project Title: SomnoCare — Simplified AI CPAP Adherence, Sleep Apnea Screening & Lifestyle Coach",
             "Problem Statement: Build an intelligent, accessible healthcare & wellness agent using Google ADK, Gemini 2.5 Flash, Cloud Run & Firestore that empowers everyday patients to screen for Obstructive Sleep Apnea (OSA), maintain CPAP insurance compliance, and improve airway health.",
             "Live Prototype: https://somnocare-ai.netlify.app  |  GitHub: https://github.com/Bhuvanani14/somnocare",

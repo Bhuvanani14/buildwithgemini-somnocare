@@ -60,7 +60,7 @@ def build_pdf_from_pptx() -> None:
     prs = Presentation(str(PPTX_PATH))
     c = canvas.Canvas(str(OUT_ROOT_PDF), pagesize=(PAGE_W, PAGE_H), pageCompression=1)
     c.setTitle("SomnoCare — Gen AI Academy APAC Prototype Submission Deck")
-    c.setAuthor("Bhuvanani Vattikonda")
+    c.setAuthor("Bhuvanani Vattikonda & Darshan Gowda")
 
     for slide_idx, slide in enumerate(prs.slides, 1):
         # White slide background
